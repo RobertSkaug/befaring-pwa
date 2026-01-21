@@ -1,11 +1,17 @@
-const STORAGE_KEY = "befaring_state_v3";
+const STORAGE_KEY = "befaring_state_v4";
 const BRREG_URL = "https://data.brreg.no/enhetsregisteret/api/enheter";
 
 let state = {
   inspectionDate: new Date().toISOString().slice(0,10),
   customer: { orgnr:"", name:"", orgForm:"", industry:"" },
-  locations: [ newLocation("LOC-1") ],
-  activeLocationId: "LOC-1"
+
+  locations: [
+    newLocation("LOC-1")
+  ],
+  activeLocationId: "LOC-1",
+
+  // NYTT: avvik ligger globalt, men er alltid bundet til locationId
+  deviations: [] // { id, locationId, title, severity, desc, photoDataUrl, createdAt }
 };
 
 let lastAddrSuggestions = [];
@@ -18,8 +24,7 @@ function newLocation(id){
   return {
     id,
     address: "",
-    geo: { lat:null, lng:null, accuracy:null, ts:null },
-    deviations: []
+    geo: { lat:null, lng:null, accuracy:null, ts:null }
   };
 }
 
@@ -27,14 +32,49 @@ function getActiveLocation(){
   return state.locations.find(l => l.id === state.activeLocationId) || state.locations[0];
 }
 
+function locationIndexById(id){
+  return Math.max(0, state.locations.findIndex(l => l.id === id));
+}
+
 function shortAddress(addr, fallback){
   const s = (addr || "").trim();
   if (!s) return fallback;
-  // keep first 50 chars, but avoid ugly cuts
   return s.length > 50 ? s.slice(0, 47) + "…" : s;
 }
 
+function getDeviationsForLocation(locationId){
+  return (state.deviations || []).filter(d => d.locationId === locationId);
+}
+
+function nextDeviationIdForLocation(locationId){
+  const count = getDeviationsForLocation(locationId).length;
+  return `AV-${String(count + 1).padStart(4,"0")}`;
+}
+
+function normalizeState(){
+  // Ensure required structures exist
+  if (!state.locations || !Array.isArray(state.locations) || state.locations.length === 0) {
+    state.locations = [ newLocation("LOC-1") ];
+  }
+  if (!state.activeLocationId) state.activeLocationId = state.locations[0].id;
+
+  // Ensure deviations exist
+  if (!state.deviations || !Array.isArray(state.deviations)) state.deviations = [];
+
+  // Remove deviations pointing to non-existing locations
+  const locIds = new Set(state.locations.map(l => l.id));
+  state.deviations = state.deviations.filter(d => locIds.has(d.locationId));
+}
+
+function clearDeviationForm(){
+  $("devTitle").value = "";
+  $("devDesc").value = "";
+  $("devPhoto").value = "";
+}
+
 function init(){
+  normalizeState();
+
   $("inspectionDate").value = state.inspectionDate;
 
   $("orgnr").addEventListener("input", onOrgnr);
@@ -47,7 +87,6 @@ function init(){
   $("address").addEventListener("input", e => {
     const loc = getActiveLocation();
     loc.address = e.target.value;
-    // update tabs label as you type
     renderLocationTabs();
     renderDevHeader();
   });
@@ -59,7 +98,9 @@ function init(){
   $("btnSave").addEventListener("click", save);
   $("btnLoad").addEventListener("click", load);
   $("btnReset").addEventListener("click", resetAll);
+
   $("btnExport").addEventListener("click", exportWord);
+  $("btnExportPdf").addEventListener("click", exportPdf);
 
   renderAll();
 }
@@ -68,14 +109,17 @@ function addLocation(){
   const id = `LOC-${state.locations.length + 1}`;
   state.locations.push(newLocation(id));
   state.activeLocationId = id;
+
   renderAddressSuggestions([]);
+  clearDeviationForm();
   renderAll();
 }
 
 function setActiveLocation(id){
   state.activeLocationId = id;
-  // clear suggestions when switching location, so you don’t accidentally pick the wrong one
+
   renderAddressSuggestions([]);
+  clearDeviationForm();
   renderAll();
 }
 
@@ -103,7 +147,8 @@ function renderLocationTabs(){
     const active = (l.id === state.activeLocationId) ? "active" : "";
     const fallback = `Lokasjon ${idx+1}`;
     const label = shortAddress(l.address, fallback);
-    const count = (l.deviations || []).length;
+    const count = getDeviationsForLocation(l.id).length;
+
     return `
       <button class="locTab ${active}" data-loc="${esc(l.id)}" title="${esc(l.address || fallback)}">
         <span class="locTab__label">${esc(label)}</span>
@@ -118,10 +163,10 @@ function renderLocationTabs(){
 
 function renderDevHeader(){
   const loc = getActiveLocation();
-  const idx = state.locations.findIndex(x => x.id === loc.id);
+  const idx = locationIndexById(loc.id);
   const locName = `Lokasjon ${idx + 1}`;
   const addr = loc.address ? loc.address : "(adresse ikke valgt)";
-  const count = (loc.deviations || []).length;
+  const count = getDeviationsForLocation(loc.id).length;
 
   $("devHeaderTitle").textContent = `Avvik – ${locName}`;
   $("devHeaderSub").textContent = `${addr} • ${count} avvik`;
@@ -283,7 +328,6 @@ function renderAddressSuggestions(list){
 
       $("addrBox").style.display = "none";
 
-      // update UI that depends on address
       renderLocationTabs();
       renderDevHeader();
     });
@@ -304,17 +348,23 @@ async function addDeviation(){
   let photoDataUrl = "";
   const file = $("devPhoto").files?.[0];
   if (file) {
-    // More conservative for Word: smaller maxDim + quality
-    photoDataUrl = await readAsDataUrlCompressed(file, 1100, 0.78);
+    // conservative to keep Word/PDF light and reliable
+    photoDataUrl = await readAsDataUrlCompressed(file, 1200, 0.78);
   }
 
-  const id = `AV-${String(loc.deviations.length+1).padStart(4,"0")}`;
-  loc.deviations.push({ id, title, severity, desc, photoDataUrl });
+  const deviation = {
+    id: nextDeviationIdForLocation(loc.id),
+    locationId: loc.id,
+    title,
+    severity,
+    desc,
+    photoDataUrl,
+    createdAt: new Date().toISOString()
+  };
 
-  $("devTitle").value = "";
-  $("devDesc").value = "";
-  $("devPhoto").value = "";
+  state.deviations.push(deviation);
 
+  clearDeviationForm();
   renderLocationTabs();
   renderDevHeader();
   renderDevs();
@@ -322,14 +372,15 @@ async function addDeviation(){
 
 function renderDevs(){
   const loc = getActiveLocation();
+  const list = getDeviationsForLocation(loc.id);
   const root = $("devList");
 
-  if(!loc.deviations.length){
+  if(!list.length){
     root.innerHTML = `<p class="muted">Ingen avvik registrert for denne lokasjonen.</p>`;
     return;
   }
 
-  root.innerHTML = loc.deviations.map(d => `
+  root.innerHTML = list.map(d => `
     <div class="dev">
       <div><strong>${esc(d.id)}</strong> – ${esc(d.title)} <span class="muted">(${esc(d.severity)})</span></div>
       ${d.desc ? `<div class="muted" style="margin-top:6px;">${esc(d.desc).replaceAll("\n","<br>")}</div>` : ""}
@@ -343,7 +394,7 @@ function renderDevs(){
   root.querySelectorAll("[data-del]").forEach(btn=>{
     btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-del");
-      loc.deviations = loc.deviations.filter(x => x.id !== id);
+      state.deviations = state.deviations.filter(x => x.id !== id || x.locationId !== loc.id);
       renderLocationTabs();
       renderDevHeader();
       renderDevs();
@@ -366,12 +417,17 @@ function load(){
 
   state = JSON.parse(raw);
 
-  // Backward compat
-  if (!state.locations || !state.locations.length) {
-    state.locations = [ newLocation("LOC-1") ];
-    state.activeLocationId = "LOC-1";
+  // Migration from older versions where deviations were inside each location:
+  if (!state.deviations && state.locations?.some(l => Array.isArray(l.deviations))) {
+    const migrated = [];
+    state.locations.forEach(l => {
+      (l.deviations || []).forEach(d => migrated.push({ ...d, locationId: l.id }));
+      delete l.deviations;
+    });
+    state.deviations = migrated;
   }
-  if (!state.activeLocationId) state.activeLocationId = state.locations[0].id;
+
+  normalizeState();
 
   $("orgnr").value = state.customer?.orgnr || "";
   $("customerName").value = state.customer?.name || "";
@@ -391,7 +447,8 @@ function resetAll(){
     inspectionDate: new Date().toISOString().slice(0,10),
     customer: { orgnr:"", name:"", orgForm:"", industry:"" },
     locations: [ newLocation("LOC-1") ],
-    activeLocationId: "LOC-1"
+    activeLocationId: "LOC-1",
+    deviations: []
   };
 
   $("orgnr").value = "";
@@ -402,56 +459,39 @@ function resetAll(){
   $("brregStatus").textContent = "BRREG: klar";
 
   renderAddressSuggestions([]);
+  clearDeviationForm();
   renderAll();
 }
 
+/**
+ * Reliable export: PDF via browser print engine (images always render).
+ * Opens a new tab with the report and triggers print dialog.
+ */
+function exportPdf(){
+  const html = buildReportHtml({ forPrint: true });
+  const w = window.open("", "_blank");
+  if (!w) {
+    alert("Kunne ikke åpne nytt vindu. Sjekk popup-blokkering.");
+    return;
+  }
+  w.document.open();
+  w.document.write(html);
+  w.document.close();
+  w.focus();
+  // let the browser finish rendering images
+  setTimeout(() => w.print(), 700);
+}
+
+/**
+ * Word export: best-effort HTML .doc (can be inconsistent with embedded images in some Word setups).
+ */
 function exportWord(){
   const dateStr = state.inspectionDate || new Date().toISOString().slice(0,10);
   const fnameBase = (state.customer?.name || "Befaring")
     .replace(/[^\w\- ]+/g,"").trim().replace(/\s+/g,"_") || "Befaring";
   const fname = `${fnameBase}_${dateStr}.doc`;
 
-  // Word-safe “text width” for A4 with margins: ~16cm
-  const imgStyle = "width:100%; max-width:16cm; height:auto; display:block; margin:10px 0; border:1px solid #ddd; border-radius:8px;";
-
-  const locBlocks = state.locations.map((l, idx) => {
-    const locTitle = `Lokasjon ${idx+1}`;
-    const addr = l.address || "(adresse ikke valgt)";
-    const gps = (l.geo?.lat && l.geo?.lng)
-      ? `${l.geo.lat.toFixed(5)}, ${l.geo.lng.toFixed(5)} (±${Math.round(l.geo.accuracy||0)}m)`
-      : "ikke hentet";
-
-    const devs = (l.deviations || []).map((d, n) => `
-      <div style="margin:12px 0 0;">
-        <h4 style="margin:0 0 6px;">${n+1}. ${esc(d.title)} <span style="color:#666;">(${esc(d.severity)})</span></h4>
-        <div style="margin:0 0 6px;"><strong>ID:</strong> ${esc(d.id)}</div>
-        ${d.desc ? `<div style="margin:0 0 6px;"><strong>Beskrivelse:</strong><br>${esc(d.desc).replaceAll("\n","<br>")}</div>` : ""}
-        ${d.photoDataUrl ? `<img src="${d.photoDataUrl}" style="${imgStyle}">` : ""}
-      </div>
-      <div style="border-top:1px solid #eee; margin:12px 0;"></div>
-    `).join("") || "<div>Ingen avvik.</div>";
-
-    return `
-      <div style="page-break-inside:avoid; margin-top:18px;">
-        <h2 style="margin:0 0 6px;">${esc(locTitle)} – ${esc(addr)}</h2>
-        <div><strong>GPS:</strong> ${esc(gps)}</div>
-        <h3 style="margin:12px 0 8px;">Avvik</h3>
-        ${devs}
-      </div>
-    `;
-  }).join("");
-
-  const html = `
-    <!doctype html><html><head><meta charset="utf-8"></head>
-    <body style="font-family:Arial,sans-serif;color:#333; font-size:11pt;">
-      <h1 style="margin:0 0 10px;">Befaringsrapport</h1>
-      <div><strong>Dato:</strong> ${esc(dateStr)}</div>
-      <div><strong>Kunde:</strong> ${esc(state.customer?.name || "")} &nbsp; <strong>Org.nr:</strong> ${esc(state.customer?.orgnr || "")}</div>
-      ${state.customer?.orgForm ? `<div><strong>Org.form:</strong> ${esc(state.customer.orgForm)}</div>` : ""}
-      ${state.customer?.industry ? `<div><strong>Næringskode:</strong> ${esc(state.customer.industry)}</div>` : ""}
-      ${locBlocks}
-    </body></html>
-  `;
+  const html = buildReportHtml({ forPrint: false });
 
   const blob = new Blob([html], { type:"application/msword" });
   const url = URL.createObjectURL(blob);
@@ -464,7 +504,67 @@ function exportWord(){
   URL.revokeObjectURL(url);
 }
 
-function readAsDataUrlCompressed(file, maxDim = 1100, quality = 0.78){
+function buildReportHtml({ forPrint }){
+  const dateStr = state.inspectionDate || new Date().toISOString().slice(0,10);
+
+  // A4 text width safe inside Word/print with normal margins: ~16cm
+  const imgStyle = "width:100%; max-width:16cm; height:auto; display:block; margin:10px 0; border:1px solid #ddd; border-radius:8px;";
+
+  const printCss = forPrint ? `
+    <style>
+      @page { size: A4; margin: 16mm; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      h1, h2, h3, h4 { page-break-after: avoid; }
+      .loc { page-break-inside: avoid; }
+      .dev { page-break-inside: avoid; }
+      img { page-break-inside: avoid; }
+    </style>
+  ` : "";
+
+  const locBlocks = state.locations.map((l, idx) => {
+    const locTitle = `Lokasjon ${idx+1}`;
+    const addr = l.address || "(adresse ikke valgt)";
+    const gps = (l.geo?.lat && l.geo?.lng)
+      ? `${l.geo.lat.toFixed(5)}, ${l.geo.lng.toFixed(5)} (±${Math.round(l.geo.accuracy||0)}m)`
+      : "ikke hentet";
+
+    const devs = getDeviationsForLocation(l.id);
+    const devHtml = devs.length ? devs.map((d, n) => `
+      <div class="dev" style="margin:12px 0 0;">
+        <h4 style="margin:0 0 6px;">${n+1}. ${esc(d.title)} <span style="color:#666;">(${esc(d.severity)})</span></h4>
+        <div style="margin:0 0 6px;"><strong>ID:</strong> ${esc(d.id)}</div>
+        ${d.desc ? `<div style="margin:0 0 6px;"><strong>Beskrivelse:</strong><br>${esc(d.desc).replaceAll("\n","<br>")}</div>` : ""}
+        ${d.photoDataUrl ? `<img src="${d.photoDataUrl}" style="${imgStyle}">` : ""}
+      </div>
+      <div style="border-top:1px solid #eee; margin:12px 0;"></div>
+    `).join("") : "<div>Ingen avvik.</div>";
+
+    return `
+      <div class="loc" style="margin-top:18px;">
+        <h2 style="margin:0 0 6px;">${esc(locTitle)} – ${esc(addr)}</h2>
+        <div><strong>GPS:</strong> ${esc(gps)}</div>
+        <h3 style="margin:12px 0 8px;">Avvik</h3>
+        ${devHtml}
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <!doctype html><html><head><meta charset="utf-8">
+    ${printCss}
+    </head>
+    <body style="font-family:Arial,sans-serif;color:#333; font-size:11pt;">
+      <h1 style="margin:0 0 10px;">Befaringsrapport</h1>
+      <div><strong>Dato:</strong> ${esc(dateStr)}</div>
+      <div><strong>Kunde:</strong> ${esc(state.customer?.name || "")} &nbsp; <strong>Org.nr:</strong> ${esc(state.customer?.orgnr || "")}</div>
+      ${state.customer?.orgForm ? `<div><strong>Org.form:</strong> ${esc(state.customer.orgForm)}</div>` : ""}
+      ${state.customer?.industry ? `<div><strong>Næringskode:</strong> ${esc(state.customer.industry)}</div>` : ""}
+      ${locBlocks}
+    </body></html>
+  `;
+}
+
+function readAsDataUrlCompressed(file, maxDim = 1200, quality = 0.78){
   return new Promise((resolve, reject) => {
     const img = new Image();
     const reader = new FileReader();
