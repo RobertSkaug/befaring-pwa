@@ -1,17 +1,35 @@
-const STORAGE_KEY = "befaring_state_v1";
+const STORAGE_KEY = "befaring_state_v2";
 const BRREG_URL = "https://data.brreg.no/enhetsregisteret/api/enheter";
 
 let state = {
   inspectionDate: new Date().toISOString().slice(0,10),
   customer: { orgnr:"", name:"", orgForm:"", industry:"" },
-  address: "",
-  geo: { lat:null, lng:null, accuracy:null, ts:null },
-  deviations: [] // {id,title,severity,desc,photoDataUrl}
+
+  // NYTT: flere lokasjoner
+  locations: [
+    newLocation("LOC-1")
+  ],
+  activeLocationId: "LOC-1"
 };
+
+let lastAddrSuggestions = [];
 
 const $ = (id) => document.getElementById(id);
 const digits = (s) => (s||"").replace(/\D+/g,"");
 const esc = (s) => String(s??"").replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+
+function newLocation(id){
+  return {
+    id,
+    address: "",
+    geo: { lat:null, lng:null, accuracy:null, ts:null },
+    deviations: [] // {id,title,severity,desc,photoDataUrl}
+  };
+}
+
+function getActiveLocation(){
+  return state.locations.find(l => l.id === state.activeLocationId) || state.locations[0];
+}
 
 function init(){
   $("inspectionDate").value = state.inspectionDate;
@@ -21,18 +39,75 @@ function init(){
   $("orgForm").addEventListener("input", e => state.customer.orgForm = e.target.value);
   $("industry").addEventListener("input", e => state.customer.industry = e.target.value);
 
-  $("address").addEventListener("input", e => state.address = e.target.value);
   $("inspectionDate").addEventListener("input", e => state.inspectionDate = e.target.value);
+
+  $("address").addEventListener("input", e => {
+    const loc = getActiveLocation();
+    loc.address = e.target.value;
+  });
 
   $("btnGPS").addEventListener("click", getGPS);
   $("btnAddDev").addEventListener("click", addDeviation);
+
+  $("btnAddLocation").addEventListener("click", addLocation);
 
   $("btnSave").addEventListener("click", save);
   $("btnLoad").addEventListener("click", load);
   $("btnReset").addEventListener("click", resetAll);
   $("btnExport").addEventListener("click", exportWord);
 
-  render();
+  renderAll();
+}
+
+function addLocation(){
+  const nextNr = state.locations.length + 1;
+  const id = `LOC-${nextNr}`;
+  state.locations.push(newLocation(id));
+  state.activeLocationId = id;
+
+  // rydd forslag ved bytte
+  renderAddressSuggestions([]);
+
+  renderAll();
+}
+
+function setActiveLocation(id){
+  state.activeLocationId = id;
+  renderAddressSuggestions([]);
+  renderAll();
+}
+
+function renderAll(){
+  renderLocationTabs();
+
+  const loc = getActiveLocation();
+  $("inspectionDate").value = state.inspectionDate || new Date().toISOString().slice(0,10);
+  $("address").value = loc.address || "";
+
+  if(loc.geo.lat && loc.geo.lng){
+    $("gpsStatus").textContent =
+      `GPS: ${loc.geo.lat.toFixed(5)}, ${loc.geo.lng.toFixed(5)} (±${Math.round(loc.geo.accuracy||0)}m)`;
+  } else {
+    $("gpsStatus").textContent = "GPS: ikke hentet";
+  }
+
+  renderDevs();
+}
+
+function renderLocationTabs(){
+  const root = $("locTabs");
+  const locs = state.locations;
+
+  root.innerHTML = locs.map((l, idx) => {
+    const active = l.id === state.activeLocationId ? "active" : "";
+    const label = `Lokasjon ${idx+1}`;
+    const hasAddr = l.address ? "•" : "";
+    return `<button class="locTab ${active}" data-loc="${esc(l.id)}">${esc(label)} <span class="small">${esc(hasAddr)}</span></button>`;
+  }).join("");
+
+  root.querySelectorAll("[data-loc]").forEach(btn => {
+    btn.addEventListener("click", () => setActiveLocation(btn.getAttribute("data-loc")));
+  });
 }
 
 async function onOrgnr(e){
@@ -71,32 +146,33 @@ async function brregFetch(orgnr){
 }
 
 function getGPS(){
+  const loc = getActiveLocation();
+
   if(!navigator.geolocation){
     alert("GPS ikke tilgjengelig i denne nettleseren.");
     return;
   }
 
-  // Skjul gamle forslag mens vi henter nye
   renderAddressSuggestions([]);
-
   $("gpsStatus").textContent = "GPS: henter…";
+
   navigator.geolocation.getCurrentPosition(async pos => {
-    state.geo.lat = pos.coords.latitude;
-    state.geo.lng = pos.coords.longitude;
-    state.geo.accuracy = pos.coords.accuracy;
-    state.geo.ts = new Date(pos.timestamp).toISOString();
+    loc.geo.lat = pos.coords.latitude;
+    loc.geo.lng = pos.coords.longitude;
+    loc.geo.accuracy = pos.coords.accuracy;
+    loc.geo.ts = new Date(pos.timestamp).toISOString();
 
     $("gpsStatus").textContent =
-      `GPS: ${state.geo.lat.toFixed(5)}, ${state.geo.lng.toFixed(5)} (±${Math.round(state.geo.accuracy)}m) – søker adresser…`;
+      `GPS: ${loc.geo.lat.toFixed(5)}, ${loc.geo.lng.toFixed(5)} (±${Math.round(loc.geo.accuracy)}m) – søker adresser…`;
 
     try{
-      const list = await fetchAddressSuggestions(state.geo.lat, state.geo.lng);
+      const list = await fetchAddressSuggestions(loc.geo.lat, loc.geo.lng);
       $("gpsStatus").textContent =
-        `GPS: ${state.geo.lat.toFixed(5)}, ${state.geo.lng.toFixed(5)} (±${Math.round(state.geo.accuracy)}m)`;
+        `GPS: ${loc.geo.lat.toFixed(5)}, ${loc.geo.lng.toFixed(5)} (±${Math.round(loc.geo.accuracy)}m)`;
       renderAddressSuggestions(list);
     } catch {
       $("gpsStatus").textContent =
-        `GPS: ${state.geo.lat.toFixed(5)}, ${state.geo.lng.toFixed(5)} (±${Math.round(state.geo.accuracy)}m)`;
+        `GPS: ${loc.geo.lat.toFixed(5)}, ${loc.geo.lng.toFixed(5)} (±${Math.round(loc.geo.accuracy)}m)`;
       renderAddressSuggestions([]);
     }
 
@@ -106,10 +182,6 @@ function getGPS(){
   }, { enableHighAccuracy:true, timeout:12000, maximumAge:15000 });
 }
 
-/**
- * Henter flere adresseforslag i nærheten ved å reverse-geocode posisjonen
- * og noen punkter rundt (for å få flere relevante treff).
- */
 async function fetchAddressSuggestions(lat, lng){
   const d = 0.00025; // ~25–30 meter
   const points = [
@@ -127,10 +199,9 @@ async function fetchAddressSuggestions(lat, lng){
       const r = await reverseGeocodeNominatim(p.lat, p.lng);
       if (r) results.push(r);
     } catch {}
-    await sleep(250); // liten pause for å være snill mot tjenesten
+    await sleep(250);
   }
 
-  // Dedupe på display_name
   const seen = new Set();
   const unique = [];
   for (const r of results) {
@@ -140,7 +211,7 @@ async function fetchAddressSuggestions(lat, lng){
     unique.push(r);
   }
 
-  return unique.slice(0, 5);
+  return unique.slice(0, 6);
 }
 
 async function reverseGeocodeNominatim(lat, lng){
@@ -159,25 +230,24 @@ async function reverseGeocodeNominatim(lat, lng){
   return {
     display_name: data.display_name,
     line1: line1 || data.display_name,
-    line2: line2 || "",
-    lat: Number(data.lat),
-    lon: Number(data.lon)
+    line2: line2 || ""
   };
 }
 
 function renderAddressSuggestions(list){
+  lastAddrSuggestions = list || [];
+
   const box = $("addrBox");
   const root = $("addrSuggestions");
-  if (!box || !root) return;
 
-  if (!list || list.length === 0){
+  if (!lastAddrSuggestions.length){
     box.style.display = "none";
     root.innerHTML = "";
     return;
   }
 
   box.style.display = "block";
-  root.innerHTML = list.map((x, idx) => `
+  root.innerHTML = lastAddrSuggestions.map((x, idx) => `
     <div class="addrItem" data-idx="${idx}">
       <div class="addrItem__main">${esc(x.line1)}</div>
       <div class="addrItem__sub">${esc(x.line2 || x.display_name)}</div>
@@ -187,16 +257,15 @@ function renderAddressSuggestions(list){
   root.querySelectorAll(".addrItem").forEach(el => {
     el.addEventListener("click", () => {
       const idx = Number(el.getAttribute("data-idx"));
-      const picked = list[idx];
+      const picked = lastAddrSuggestions[idx];
       if (!picked) return;
 
-      state.address = picked.display_name;
+      const loc = getActiveLocation();
+      loc.address = picked.display_name;
       $("address").value = picked.display_name;
 
-      // Skjul listen etter valg
       $("addrBox").style.display = "none";
-
-      render();
+      renderAll();
     });
   });
 }
@@ -204,6 +273,8 @@ function renderAddressSuggestions(list){
 function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
 async function addDeviation(){
+  const loc = getActiveLocation();
+
   const title = $("devTitle").value.trim();
   if(!title){ alert("Tittel mangler."); return; }
 
@@ -212,32 +283,30 @@ async function addDeviation(){
 
   let photoDataUrl = "";
   const file = $("devPhoto").files?.[0];
-  if (file) photoDataUrl = await readAsDataUrl(file);
+  if (file) {
+    // Komprimer bildet for å unngå gigantiske rapporter
+    photoDataUrl = await readAsDataUrlCompressed(file, 1280, 0.82);
+  }
 
-  const id = `AV-${String(state.deviations.length+1).padStart(6,"0")}`;
-  state.deviations.push({ id, title, severity, desc, photoDataUrl });
+  const id = `AV-${String(loc.deviations.length+1).padStart(6,"0")}`;
+  loc.deviations.push({ id, title, severity, desc, photoDataUrl });
 
   $("devTitle").value = "";
   $("devDesc").value = "";
   $("devPhoto").value = "";
-  render();
+  renderDevs();
 }
 
-function render(){
-  $("inspectionDate").value = state.inspectionDate || new Date().toISOString().slice(0,10);
-
-  if(state.geo.lat && state.geo.lng){
-    $("gpsStatus").textContent =
-      `GPS: ${state.geo.lat.toFixed(5)}, ${state.geo.lng.toFixed(5)} (±${Math.round(state.geo.accuracy||0)}m)`;
-  }
-
+function renderDevs(){
+  const loc = getActiveLocation();
   const root = $("devList");
-  if(!state.deviations.length){
-    root.innerHTML = `<p class="muted">Ingen avvik registrert.</p>`;
+
+  if(!loc.deviations.length){
+    root.innerHTML = `<p class="muted">Ingen avvik registrert for denne lokasjonen.</p>`;
     return;
   }
 
-  root.innerHTML = state.deviations.map(d => `
+  root.innerHTML = loc.deviations.map(d => `
     <div class="dev">
       <div><strong>${esc(d.id)}</strong> – ${esc(d.title)} <span class="muted">(${esc(d.severity)})</span></div>
       ${d.desc ? `<div class="muted" style="margin-top:6px;">${esc(d.desc).replaceAll("\n","<br>")}</div>` : ""}
@@ -251,8 +320,8 @@ function render(){
   root.querySelectorAll("[data-del]").forEach(btn=>{
     btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-del");
-      state.deviations = state.deviations.filter(x => x.id !== id);
-      render();
+      loc.deviations = loc.deviations.filter(x => x.id !== id);
+      renderDevs();
     });
   });
 }
@@ -269,67 +338,88 @@ function save(){
 function load(){
   const raw = localStorage.getItem(STORAGE_KEY);
   if(!raw){ alert("Ingen lagring funnet."); return; }
+
   state = JSON.parse(raw);
 
-  $("orgnr").value = state.customer.orgnr || "";
-  $("customerName").value = state.customer.name || "";
-  $("orgForm").value = state.customer.orgForm || "";
-  $("industry").value = state.customer.industry || "";
-  $("address").value = state.address || "";
+  // Backward-compat: hvis gammel state mangler locations
+  if (!state.locations || !state.locations.length) {
+    state.locations = [ newLocation("LOC-1") ];
+    state.activeLocationId = "LOC-1";
+  }
+  if (!state.activeLocationId) state.activeLocationId = state.locations[0].id;
+
+  $("orgnr").value = state.customer?.orgnr || "";
+  $("customerName").value = state.customer?.name || "";
+  $("orgForm").value = state.customer?.orgForm || "";
+  $("industry").value = state.customer?.industry || "";
   $("inspectionDate").value = state.inspectionDate || new Date().toISOString().slice(0,10);
 
-  render();
+  renderAddressSuggestions([]);
+  renderAll();
   alert("Lastet.");
 }
 
 function resetAll(){
   if(!confirm("Nullstille alt?")) return;
+
   state = {
     inspectionDate: new Date().toISOString().slice(0,10),
     customer: { orgnr:"", name:"", orgForm:"", industry:"" },
-    address: "",
-    geo: { lat:null, lng:null, accuracy:null, ts:null },
-    deviations: []
+    locations: [ newLocation("LOC-1") ],
+    activeLocationId: "LOC-1"
   };
 
   $("orgnr").value = "";
   $("customerName").value = "";
   $("orgForm").value = "";
   $("industry").value = "";
-  $("address").value = "";
   $("inspectionDate").value = state.inspectionDate;
   $("brregStatus").textContent = "BRREG: klar";
-  $("gpsStatus").textContent = "GPS: ikke hentet";
 
   renderAddressSuggestions([]);
-  render();
+  renderAll();
 }
 
 function exportWord(){
   const dateStr = state.inspectionDate || new Date().toISOString().slice(0,10);
-  const fnameBase = (state.customer.name || "Befaring")
+  const fnameBase = (state.customer?.name || "Befaring")
     .replace(/[^\w\- ]+/g,"").trim().replace(/\s+/g,"_") || "Befaring";
   const fname = `${fnameBase}_${dateStr}.doc`;
 
-  const devs = state.deviations.map(d=>`
-    <h3>Avvik ${esc(d.id)} – ${esc(d.title)}</h3>
-    <div><strong>Alvorlighet:</strong> ${esc(d.severity)}</div>
-    ${d.desc ? `<div><strong>Beskrivelse:</strong><br>${esc(d.desc).replaceAll("\n","<br>")}</div>` : ""}
-    ${d.photoDataUrl ? `<div style="margin-top:10px;"><img src="${d.photoDataUrl}" style="max-width:100%; border:1px solid #ddd; border-radius:10px;"></div>` : ""}
-    <hr style="border:none; border-top:1px solid #ddd; margin:16px 0;">
-  `).join("");
+  // A4-vennlig bildeformat: max bredde og auto høyde
+  const imgStyle = "width:100%; max-width:600px; height:auto; display:block; margin:10px 0; border:1px solid #ddd; border-radius:10px;";
+
+  const locBlocks = state.locations.map((l, idx) => {
+    const locTitle = `Lokasjon ${idx+1}`;
+    const addr = l.address || "(adresse ikke satt)";
+    const gps = (l.geo?.lat && l.geo?.lng) ? `${l.geo.lat.toFixed(5)}, ${l.geo.lng.toFixed(5)} (±${Math.round(l.geo.accuracy||0)}m)` : "ikke hentet";
+
+    const devs = (l.deviations || []).map(d => `
+      <h4 style="margin:14px 0 6px;">Avvik ${esc(d.id)} – ${esc(d.title)}</h4>
+      <div><strong>Alvorlighet:</strong> ${esc(d.severity)}</div>
+      ${d.desc ? `<div><strong>Beskrivelse:</strong><br>${esc(d.desc).replaceAll("\n","<br>")}</div>` : ""}
+      ${d.photoDataUrl ? `<img src="${d.photoDataUrl}" style="${imgStyle}">` : ""}
+    `).join("") || "<div>Ingen avvik.</div>";
+
+    return `
+      <hr style="border:none; border-top:2px solid #eee; margin:18px 0;">
+      <h2 style="margin:0 0 8px;">${esc(locTitle)}</h2>
+      <div><strong>Adresse:</strong> ${esc(addr)}</div>
+      <div><strong>GPS:</strong> ${esc(gps)}</div>
+      <h3 style="margin:14px 0 8px;">Avvik</h3>
+      ${devs}
+    `;
+  }).join("");
 
   const html = `
-    <!doctype html><html><head><meta charset="utf-8"></head><body style="font-family:Arial,sans-serif;color:#333;">
-    <h1>Befaringsrapport</h1>
-    <div><strong>Dato:</strong> ${esc(dateStr)}</div>
-    <div><strong>Kunde:</strong> ${esc(state.customer.name)} &nbsp; <strong>Org.nr:</strong> ${esc(state.customer.orgnr)}</div>
-    ${state.customer.orgForm ? `<div><strong>Org.form:</strong> ${esc(state.customer.orgForm)}</div>` : ""}
-    ${state.customer.industry ? `<div><strong>Næringskode:</strong> ${esc(state.customer.industry)}</div>` : ""}
-    <div><strong>Adresse:</strong> ${esc(state.address||"")}</div>
-    ${(state.geo.lat&&state.geo.lng) ? `<div><strong>Koordinater:</strong> ${state.geo.lat.toFixed(5)}, ${state.geo.lng.toFixed(5)} (±${Math.round(state.geo.accuracy||0)}m)</div>` : ""}
-    <h2>Avvik</h2>
-    ${devs || "<div>Ingen avvik.</div>"}
+    <!doctype html><html><head><meta charset="utf-8"></head>
+    <body style="font-family:Arial,sans-serif;color:#333; font-size:11pt;">
+      <h1 style="margin:0 0 10px;">Befaringsrapport</h1>
+      <div><strong>Dato:</strong> ${esc(dateStr)}</div>
+      <div><strong>Kunde:</strong> ${esc(state.customer?.name || "")} &nbsp; <strong>Org.nr:</strong> ${esc(state.customer?.orgnr || "")}</div>
+      ${state.customer?.orgForm ? `<div><strong>Org.form:</strong> ${esc(state.customer.orgForm)}</div>` : ""}
+      ${state.customer?.industry ? `<div><strong>Næringskode:</strong> ${esc(state.customer.industry)}</div>` : ""}
+      ${locBlocks}
     </body></html>
   `;
 
@@ -344,12 +434,39 @@ function exportWord(){
   URL.revokeObjectURL(url);
 }
 
-function readAsDataUrl(file){
-  return new Promise((resolve,reject)=>{
-    const r = new FileReader();
-    r.onload = ()=> resolve(r.result);
-    r.onerror = ()=> reject(r.error);
-    r.readAsDataURL(file);
+/**
+ * Leser bilde og komprimerer (nedskalering + JPEG quality).
+ * maxDim: maks bredde/høyde (px). quality: 0..1
+ */
+function readAsDataUrlCompressed(file, maxDim = 1280, quality = 0.82){
+  return new Promise((resolve, reject) => {
+    const img = new Image();
+    const reader = new FileReader();
+
+    reader.onload = () => { img.src = reader.result; };
+    reader.onerror = () => reject(reader.error);
+
+    img.onload = () => {
+      let w = img.width;
+      let h = img.height;
+
+      const scale = Math.min(1, maxDim / Math.max(w, h));
+      w = Math.round(w * scale);
+      h = Math.round(h * scale);
+
+      const canvas = document.createElement("canvas");
+      canvas.width = w;
+      canvas.height = h;
+
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0, w, h);
+
+      const dataUrl = canvas.toDataURL("image/jpeg", quality);
+      resolve(dataUrl);
+    };
+
+    img.onerror = () => reject(new Error("Kunne ikke lese bilde"));
+    reader.readAsDataURL(file);
   });
 }
 

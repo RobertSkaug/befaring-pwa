@@ -61,7 +61,13 @@
   </section>
 
   <section class="card">
-    <h2>Lokasjon</h2>
+    <div class="locHeader">
+      <h2 style="margin:0;">Lokasjoner</h2>
+      <button class="btn primary" id="btnAddLocation">+ Ny lokasjon</button>
+    </div>
+
+    <!-- Faner for lokasjoner -->
+    <div id="locTabs" class="locTabs"></div>
 
     <div class="row">
       <div>
@@ -79,7 +85,7 @@
       <span class="pill"><span class="dot green"></span><span id="gpsStatus">GPS: ikke hentet</span></span>
     </div>
 
-    <!-- NYTT: Adresseforslag -->
+    <!-- Adresseforslag -->
     <div id="addrBox" class="addrBox" style="display:none;">
       <div class="addrBox__title">Forslag til adresse nær deg</div>
       <div id="addrSuggestions" class="addrBox__list"></div>
@@ -88,7 +94,7 @@
   </section>
 
   <section class="card">
-    <h2>Avvik</h2>
+    <h2>Avvik (for valgt lokasjon)</h2>
 
     <div class="row">
       <div>
@@ -113,7 +119,7 @@
 
     <div class="inline">
       <button class="btn primary" id="btnAddDev">Legg til avvik</button>
-      <span class="muted">Merk: bilder lagres lokalt i MVP.</span>
+      <span class="muted">Merk: Bilder komprimeres for rapport.</span>
     </div>
 
     <div id="devList"></div>
@@ -121,7 +127,6 @@
 </main>
 
 <script>
-  // PWA/service worker
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(()=>{});
   }
