@@ -62,10 +62,11 @@
 
   <section class="card">
     <h2>Lokasjon</h2>
+
     <div class="row">
       <div>
         <label>Adresse</label>
-        <input id="address" placeholder="Skriv adresse (MVP)" />
+        <input id="address" placeholder="Velg fra forslag eller skriv manuelt" />
       </div>
       <div>
         <label>Dato</label>
@@ -76,6 +77,13 @@
     <div class="inline">
       <button class="btn" id="btnGPS">Hent GPS</button>
       <span class="pill"><span class="dot green"></span><span id="gpsStatus">GPS: ikke hentet</span></span>
+    </div>
+
+    <!-- NYTT: Adresseforslag -->
+    <div id="addrBox" class="addrBox" style="display:none;">
+      <div class="addrBox__title">Forslag til adresse nær deg</div>
+      <div id="addrSuggestions" class="addrBox__list"></div>
+      <div class="muted">Velg riktig adresse. Du kan fortsatt redigere manuelt.</div>
     </div>
   </section>
 

@@ -75,18 +75,133 @@ function getGPS(){
     alert("GPS ikke tilgjengelig i denne nettleseren.");
     return;
   }
+
+  // Skjul gamle forslag mens vi henter nye
+  renderAddressSuggestions([]);
+
   $("gpsStatus").textContent = "GPS: henter…";
-  navigator.geolocation.getCurrentPosition(pos=>{
+  navigator.geolocation.getCurrentPosition(async pos => {
     state.geo.lat = pos.coords.latitude;
     state.geo.lng = pos.coords.longitude;
     state.geo.accuracy = pos.coords.accuracy;
     state.geo.ts = new Date(pos.timestamp).toISOString();
-    $("gpsStatus").textContent = `GPS: ${state.geo.lat.toFixed(5)}, ${state.geo.lng.toFixed(5)} (±${Math.round(state.geo.accuracy)}m)`;
-  }, err=>{
+
+    $("gpsStatus").textContent =
+      `GPS: ${state.geo.lat.toFixed(5)}, ${state.geo.lng.toFixed(5)} (±${Math.round(state.geo.accuracy)}m) – søker adresser…`;
+
+    try{
+      const list = await fetchAddressSuggestions(state.geo.lat, state.geo.lng);
+      $("gpsStatus").textContent =
+        `GPS: ${state.geo.lat.toFixed(5)}, ${state.geo.lng.toFixed(5)} (±${Math.round(state.geo.accuracy)}m)`;
+      renderAddressSuggestions(list);
+    } catch {
+      $("gpsStatus").textContent =
+        `GPS: ${state.geo.lat.toFixed(5)}, ${state.geo.lng.toFixed(5)} (±${Math.round(state.geo.accuracy)}m)`;
+      renderAddressSuggestions([]);
+    }
+
+  }, err => {
     alert("GPS-feil: " + err.message);
     $("gpsStatus").textContent = "GPS: ikke hentet";
   }, { enableHighAccuracy:true, timeout:12000, maximumAge:15000 });
 }
+
+/**
+ * Henter flere adresseforslag i nærheten ved å reverse-geocode posisjonen
+ * og noen punkter rundt (for å få flere relevante treff).
+ */
+async function fetchAddressSuggestions(lat, lng){
+  const d = 0.00025; // ~25–30 meter
+  const points = [
+    {lat, lng},
+    {lat: lat + d, lng},
+    {lat: lat - d, lng},
+    {lat, lng: lng + d},
+    {lat, lng: lng - d}
+  ];
+
+  const results = [];
+  for (let i = 0; i < points.length; i++) {
+    const p = points[i];
+    try{
+      const r = await reverseGeocodeNominatim(p.lat, p.lng);
+      if (r) results.push(r);
+    } catch {}
+    await sleep(250); // liten pause for å være snill mot tjenesten
+  }
+
+  // Dedupe på display_name
+  const seen = new Set();
+  const unique = [];
+  for (const r of results) {
+    const key = r.display_name;
+    if (!key || seen.has(key)) continue;
+    seen.add(key);
+    unique.push(r);
+  }
+
+  return unique.slice(0, 5);
+}
+
+async function reverseGeocodeNominatim(lat, lng){
+  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&addressdetails=1`;
+  const res = await fetch(url, { headers: { "Accept":"application/json" }});
+  if(!res.ok) return null;
+
+  const data = await res.json();
+  if(!data || !data.display_name) return null;
+
+  const a = data.address || {};
+  const line1 = [a.road, a.house_number].filter(Boolean).join(" ").trim();
+  const city = a.city || a.town || a.village || a.municipality || "";
+  const line2 = [a.postcode, city].filter(Boolean).join(" ").trim();
+
+  return {
+    display_name: data.display_name,
+    line1: line1 || data.display_name,
+    line2: line2 || "",
+    lat: Number(data.lat),
+    lon: Number(data.lon)
+  };
+}
+
+function renderAddressSuggestions(list){
+  const box = $("addrBox");
+  const root = $("addrSuggestions");
+  if (!box || !root) return;
+
+  if (!list || list.length === 0){
+    box.style.display = "none";
+    root.innerHTML = "";
+    return;
+  }
+
+  box.style.display = "block";
+  root.innerHTML = list.map((x, idx) => `
+    <div class="addrItem" data-idx="${idx}">
+      <div class="addrItem__main">${esc(x.line1)}</div>
+      <div class="addrItem__sub">${esc(x.line2 || x.display_name)}</div>
+    </div>
+  `).join("");
+
+  root.querySelectorAll(".addrItem").forEach(el => {
+    el.addEventListener("click", () => {
+      const idx = Number(el.getAttribute("data-idx"));
+      const picked = list[idx];
+      if (!picked) return;
+
+      state.address = picked.display_name;
+      $("address").value = picked.display_name;
+
+      // Skjul listen etter valg
+      $("addrBox").style.display = "none";
+
+      render();
+    });
+  });
+}
+
+function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
 
 async function addDeviation(){
   const title = $("devTitle").value.trim();
@@ -109,11 +224,11 @@ async function addDeviation(){
 }
 
 function render(){
-  // defaults
   $("inspectionDate").value = state.inspectionDate || new Date().toISOString().slice(0,10);
 
   if(state.geo.lat && state.geo.lng){
-    $("gpsStatus").textContent = `GPS: ${state.geo.lat.toFixed(5)}, ${state.geo.lng.toFixed(5)} (±${Math.round(state.geo.accuracy||0)}m)`;
+    $("gpsStatus").textContent =
+      `GPS: ${state.geo.lat.toFixed(5)}, ${state.geo.lng.toFixed(5)} (±${Math.round(state.geo.accuracy||0)}m)`;
   }
 
   const root = $("devList");
@@ -186,6 +301,7 @@ function resetAll(){
   $("brregStatus").textContent = "BRREG: klar";
   $("gpsStatus").textContent = "GPS: ikke hentet";
 
+  renderAddressSuggestions([]);
   render();
 }
 
