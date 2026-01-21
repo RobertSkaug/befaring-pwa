@@ -508,7 +508,7 @@ function buildReportHtml({ forPrint }){
   const dateStr = state.inspectionDate || new Date().toISOString().slice(0,10);
 
   // A4 text width safe inside Word/print with normal margins: ~16cm
-  const imgStyle = "width:100%; max-width:16cm; height:auto; display:block; margin:10px 0; border:1px solid #ddd; border-radius:8px;";
+  const imgStyle = "max-width:16cm; max-height:10cm; width:auto; height:auto; display:block; margin:10px 0; border:1px solid #ddd; border-radius:8px;";
 
   const printCss = forPrint ? `
     <style>
