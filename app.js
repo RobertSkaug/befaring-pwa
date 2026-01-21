@@ -1,17 +1,18 @@
-const STORAGE_KEY = "befaring_state_v4";
+const STORAGE_KEY = "befaring_state_v5";
 const BRREG_URL = "https://data.brreg.no/enhetsregisteret/api/enheter";
+
+// For raskere adresseforslag (cache + parallell)
+const addrCache = new Map();
+const ADDR_CACHE_TTL_MS = 2 * 60 * 1000;
 
 let state = {
   inspectionDate: new Date().toISOString().slice(0,10),
   customer: { orgnr:"", name:"", orgForm:"", industry:"" },
-
-  locations: [
-    newLocation("LOC-1")
-  ],
+  locations: [ newLocation("LOC-1") ],
   activeLocationId: "LOC-1",
 
-  // NYTT: avvik ligger globalt, men er alltid bundet til locationId
-  deviations: [] // { id, locationId, title, severity, desc, photoDataUrl, createdAt }
+  // Items: avvik/anbefalinger, bundet til locationId
+  items: [] // {id, locationId, refNo, type, severity, dueDate, title, desc, photos:[{dataUrl, reportDataUrl, comment}], createdAt}
 };
 
 let lastAddrSuggestions = [];
@@ -21,55 +22,62 @@ const digits = (s) => (s||"").replace(/\D+/g,"");
 const esc = (s) => String(s??"").replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 function newLocation(id){
-  return {
-    id,
-    address: "",
-    geo: { lat:null, lng:null, accuracy:null, ts:null }
-  };
+  return { id, address:"", geo:{ lat:null, lng:null, accuracy:null, ts:null } };
 }
-
 function getActiveLocation(){
   return state.locations.find(l => l.id === state.activeLocationId) || state.locations[0];
 }
-
 function locationIndexById(id){
   return Math.max(0, state.locations.findIndex(l => l.id === id));
 }
-
 function shortAddress(addr, fallback){
-  const s = (addr || "").trim();
-  if (!s) return fallback;
-  return s.length > 50 ? s.slice(0, 47) + "…" : s;
+  const s = (addr||"").trim();
+  if(!s) return fallback;
+  return s.length > 50 ? s.slice(0,47)+"…" : s;
 }
-
-function getDeviationsForLocation(locationId){
-  return (state.deviations || []).filter(d => d.locationId === locationId);
-}
-
-function nextDeviationIdForLocation(locationId){
-  const count = getDeviationsForLocation(locationId).length;
-  return `AV-${String(count + 1).padStart(4,"0")}`;
-}
-
 function normalizeState(){
-  // Ensure required structures exist
-  if (!state.locations || !Array.isArray(state.locations) || state.locations.length === 0) {
+  if(!state.locations || !Array.isArray(state.locations) || !state.locations.length){
     state.locations = [ newLocation("LOC-1") ];
   }
-  if (!state.activeLocationId) state.activeLocationId = state.locations[0].id;
+  if(!state.activeLocationId) state.activeLocationId = state.locations[0].id;
 
-  // Ensure deviations exist
-  if (!state.deviations || !Array.isArray(state.deviations)) state.deviations = [];
+  if(!state.items || !Array.isArray(state.items)) state.items = [];
 
-  // Remove deviations pointing to non-existing locations
-  const locIds = new Set(state.locations.map(l => l.id));
-  state.deviations = state.deviations.filter(d => locIds.has(d.locationId));
+  // remove items with missing location
+  const locIds = new Set(state.locations.map(l=>l.id));
+  state.items = state.items.filter(it => locIds.has(it.locationId));
+}
+function getItemsForLocation(locationId){
+  return (state.items||[]).filter(it => it.locationId === locationId);
+}
+function nextItemIdForLocation(locationId){
+  const count = getItemsForLocation(locationId).length;
+  return `IT-${String(count+1).padStart(4,"0")}`;
+}
+function buildRefNo(locationId){
+  const locIdx = locationIndexById(locationId) + 1;
+  const seq = nextItemIdForLocation(locationId).split("-")[1];
+  const d = new Date();
+  const mm = String(d.getMonth()+1).padStart(2,"0");
+  const yy = String(d.getFullYear()).slice(-2);
+  return `L${locIdx}-${seq}-${mm}${yy}`; // eksempel: L2-0003-0126
 }
 
-function clearDeviationForm(){
-  $("devTitle").value = "";
-  $("devDesc").value = "";
-  $("devPhoto").value = "";
+function setItemFormDefaults(){
+  const loc = getActiveLocation();
+  $("itemType").value = "AVVIK";
+  $("itemSeverity").value = "Middels";
+  $("itemDue").value = "";
+  $("itemTitle").value = "";
+  $("itemDesc").value = "";
+  $("itemPhotos").value = "";
+  $("itemRef").value = buildRefNo(loc.id);
+  updateItemFormVisibility();
+}
+function updateItemFormVisibility(){
+  const isAvvik = $("itemType").value === "AVVIK";
+  $("itemSeverity").disabled = !isAvvik;
+  $("itemDue").disabled = !isAvvik;
 }
 
 function init(){
@@ -88,11 +96,10 @@ function init(){
     const loc = getActiveLocation();
     loc.address = e.target.value;
     renderLocationTabs();
-    renderDevHeader();
+    renderItemHeader();
   });
 
   $("btnGPS").addEventListener("click", getGPS);
-  $("btnAddDev").addEventListener("click", addDeviation);
   $("btnAddLocation").addEventListener("click", addLocation);
 
   $("btnSave").addEventListener("click", save);
@@ -103,6 +110,9 @@ function init(){
   $("btnExportPdf").addEventListener("click", exportPdf);
   $("btnShare").addEventListener("click", shareReport);
 
+  $("itemType").addEventListener("change", () => updateItemFormVisibility());
+  $("btnAddItem").addEventListener("click", addItem);
+
   renderAll();
 }
 
@@ -110,17 +120,13 @@ function addLocation(){
   const id = `LOC-${state.locations.length + 1}`;
   state.locations.push(newLocation(id));
   state.activeLocationId = id;
-
   renderAddressSuggestions([]);
-  clearDeviationForm();
   renderAll();
 }
 
 function setActiveLocation(id){
   state.activeLocationId = id;
-
   renderAddressSuggestions([]);
-  clearDeviationForm();
   renderAll();
 }
 
@@ -138,8 +144,9 @@ function renderAll(){
     $("gpsStatus").textContent = "GPS: ikke hentet";
   }
 
-  renderDevHeader();
-  renderDevs();
+  renderItemHeader();
+  setItemFormDefaults();
+  renderItems();
 }
 
 function renderLocationTabs(){
@@ -148,7 +155,7 @@ function renderLocationTabs(){
     const active = (l.id === state.activeLocationId) ? "active" : "";
     const fallback = `Lokasjon ${idx+1}`;
     const label = shortAddress(l.address, fallback);
-    const count = getDeviationsForLocation(l.id).length;
+    const count = getItemsForLocation(l.id).length;
 
     return `
       <button class="locTab ${active}" data-loc="${esc(l.id)}" title="${esc(l.address || fallback)}">
@@ -162,15 +169,15 @@ function renderLocationTabs(){
   });
 }
 
-function renderDevHeader(){
+function renderItemHeader(){
   const loc = getActiveLocation();
   const idx = locationIndexById(loc.id);
-  const locName = `Lokasjon ${idx + 1}`;
+  const locName = `Lokasjon ${idx+1}`;
   const addr = loc.address ? loc.address : "(adresse ikke valgt)";
-  const count = getDeviationsForLocation(loc.id).length;
+  const count = getItemsForLocation(loc.id).length;
 
-  $("devHeaderTitle").textContent = `Avvik – ${locName}`;
-  $("devHeaderSub").textContent = `${addr} • ${count} avvik`;
+  $("devHeaderTitle").textContent = `Punkt – ${locName}`;
+  $("devHeaderSub").textContent = `${addr} • ${count} punkt`;
 }
 
 async function onOrgnr(e){
@@ -208,9 +215,13 @@ async function brregFetch(orgnr){
   }
 }
 
+function cacheKey(lat,lng){
+  const r = (x) => Math.round(x * 4000) / 4000; // ~0.00025
+  return `${r(lat)},${r(lng)}`;
+}
+
 function getGPS(){
   const loc = getActiveLocation();
-
   if(!navigator.geolocation){
     alert("GPS ikke tilgjengelig i denne nettleseren.");
     return;
@@ -245,26 +256,12 @@ function getGPS(){
   }, { enableHighAccuracy:true, timeout:12000, maximumAge:15000 });
 }
 
-const addrCache = new Map(); // key -> { t, list }
-const ADDR_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutter
-
-function cacheKey(lat, lng){
-  // avrund til ca 20–30m rutenett for stabil cache
-  const r = (x) => Math.round(x * 4000) / 4000; // ~0.00025
-  return `${r(lat)},${r(lng)}`;
-}
-
 async function fetchAddressSuggestions(lat, lng){
-  // 1) Cache (super effekt i felt)
-  const key = cacheKey(lat, lng);
+  const key = cacheKey(lat,lng);
   const cached = addrCache.get(key);
-  if (cached && (Date.now() - cached.t) < ADDR_CACHE_TTL_MS) {
-    return cached.list;
-  }
+  if (cached && (Date.now() - cached.t) < ADDR_CACHE_TTL_MS) return cached.list;
 
-  // 2) Færre punkt hvis GPS er "grovere" (valgfritt, men raskt)
-  // Du kan justere d eller antall punkter om du vil.
-  const d = 0.00025; // ~25–30m
+  const d = 0.00025;
   const points = [
     {lat, lng},
     {lat: lat + d, lng},
@@ -273,7 +270,6 @@ async function fetchAddressSuggestions(lat, lng){
     {lat, lng: lng - d}
   ];
 
-  // 3) Parallell oppslag med timeout (rask, men ikke "henger")
   const tasks = points.map(p => reverseGeocodeNominatimWithTimeout(p.lat, p.lng, 2200));
   const settled = await Promise.allSettled(tasks);
 
@@ -281,7 +277,6 @@ async function fetchAddressSuggestions(lat, lng){
     .filter(x => x.status === "fulfilled" && x.value)
     .map(x => x.value);
 
-  // Dedupe på display_name
   const seen = new Set();
   const unique = [];
   for (const r of results) {
@@ -291,36 +286,16 @@ async function fetchAddressSuggestions(lat, lng){
     unique.push(r);
   }
 
-  const list = unique.slice(0, 6);
+  const list = unique.slice(0,6);
   addrCache.set(key, { t: Date.now(), list });
   return list;
 }
 
-async function reverseGeocodeNominatim(lat, lng){
-  const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&addressdetails=1`;
-  const res = await fetch(url, { headers: { "Accept":"application/json" }});
-  if(!res.ok) return null;
-
-  const data = await res.json();
-  if(!data || !data.display_name) return null;
-
-  const a = data.address || {};
-  const line1 = [a.road, a.house_number].filter(Boolean).join(" ").trim();
-  const city = a.city || a.town || a.village || a.municipality || "";
-  const line2 = [a.postcode, city].filter(Boolean).join(" ").trim();
-
-  return {
-    display_name: data.display_name,
-    line1: line1 || data.display_name,
-    line2: line2 || ""
-  };
-}
-
-async function reverseGeocodeNominatimWithTimeout(lat, lng, timeoutMs = 2200){
+async function reverseGeocodeNominatimWithTimeout(lat, lng, timeoutMs = 2000){
   const controller = new AbortController();
-  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
 
-  try {
+  try{
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&addressdetails=1`;
     const res = await fetch(url, {
       headers: { "Accept":"application/json" },
@@ -344,13 +319,12 @@ async function reverseGeocodeNominatimWithTimeout(lat, lng, timeoutMs = 2200){
   } catch {
     return null;
   } finally {
-    clearTimeout(timeoutId);
+    clearTimeout(timer);
   }
 }
 
 function renderAddressSuggestions(list){
   lastAddrSuggestions = list || [];
-
   const box = $("addrBox");
   const root = $("addrSuggestions");
 
@@ -381,83 +355,131 @@ function renderAddressSuggestions(list){
       $("addrBox").style.display = "none";
 
       renderLocationTabs();
-      renderDevHeader();
+      renderItemHeader();
     });
   });
 }
 
-function sleep(ms){ return new Promise(r => setTimeout(r, ms)); }
-
-async function addDeviation(){
+async function addItem(){
   const loc = getActiveLocation();
 
-  const title = $("devTitle").value.trim();
-  if(!title){ alert("Tittel mangler."); return; }
+  const type = $("itemType").value; // AVVIK / ANBEFALING
+  const severity = $("itemSeverity").value;
+  const dueDate = $("itemDue").value;
+  const title = $("itemTitle").value.trim();
+  const desc = $("itemDesc").value.trim();
 
-  const severity = $("devSeverity").value;
-  const desc = $("devDesc").value.trim();
-
-  let photoDataUrl = "";
-  let photoReportDataUrl = "";
-  const file = $("devPhoto").files?.[0];
-
-  if (file) {
-    // 1) App-bilde (greit kompromiss mellom kvalitet og størrelse)
-    photoDataUrl = await readAsDataUrlConstrained(file, 1400, 1400, 0.80);
-
-    // 2) Rapport-bilde (hard begrenset: bredde/ høyde)
-    // 16cm x 10cm i Word tilsvarer typisk rundt 600–700px x 380–450px i praksis.
-    // Vi bruker litt romslig margin her, men holder høyden tydelig nede.
-    photoReportDataUrl = await readAsDataUrlConstrained(file, 900, 550, 0.80);
-  }
-
-  const deviation = {
-    id: nextDeviationIdForLocation(loc.id),
-    locationId: loc.id,
-    title,
-    severity,
-    desc,
-    photoDataUrl,
-    photoReportDataUrl,
-    createdAt: new Date().toISOString()
-  };
-
-  state.deviations.push(deviation);
-
-  clearDeviationForm();
-  renderLocationTabs();
-  renderDevHeader();
-  renderDevs();
-}
-
-function renderDevs(){
-  const loc = getActiveLocation();
-  const list = getDeviationsForLocation(loc.id);
-  const root = $("devList");
-
-  if(!list.length){
-    root.innerHTML = `<p class="muted">Ingen avvik registrert for denne lokasjonen.</p>`;
+  if(!title){
+    alert("Tittel mangler.");
     return;
   }
 
-  root.innerHTML = list.map(d => `
-    <div class="dev">
-      <div><strong>${esc(d.id)}</strong> – ${esc(d.title)} <span class="muted">(${esc(d.severity)})</span></div>
-      ${d.desc ? `<div class="muted" style="margin-top:6px;">${esc(d.desc).replaceAll("\n","<br>")}</div>` : ""}
-      ${d.photoDataUrl ? `<div class="thumbs"><img src="${d.photoDataUrl}" alt="Bilde"></div>` : ""}
-      <div class="inline" style="margin-top:10px;">
-        <button class="btn" data-del="${esc(d.id)}">Slett</button>
-      </div>
-    </div>
-  `).join("");
+  const refNo = $("itemRef").value || buildRefNo(loc.id);
 
-  root.querySelectorAll("[data-del]").forEach(btn=>{
+  // Bilder: flere filer -> flere fotoobjekter med comment
+  const files = Array.from($("itemPhotos").files || []);
+  const photos = [];
+  for (const f of files) {
+    // app-versjon
+    const dataUrl = await readAsDataUrlConstrained(f, 1400, 1400, 0.80);
+    // rapport-versjon: hard begrenset
+    const reportDataUrl = await readAsDataUrlConstrained(f, 900, 550, 0.80);
+    photos.push({ dataUrl, reportDataUrl, comment: "" });
+  }
+
+  const item = {
+    id: nextItemIdForLocation(loc.id),
+    locationId: loc.id,
+    refNo,
+    type,
+    severity: (type === "AVVIK") ? severity : "",
+    dueDate: (type === "AVVIK") ? dueDate : "",
+    title,
+    desc,
+    photos,
+    createdAt: new Date().toISOString()
+  };
+
+  state.items.push(item);
+
+  renderLocationTabs();
+  renderItemHeader();
+  setItemFormDefaults();
+  renderItems();
+}
+
+function renderItems(){
+  const loc = getActiveLocation();
+  const list = getItemsForLocation(loc.id);
+  const root = $("itemList");
+
+  if(!list.length){
+    root.innerHTML = `<p class="muted">Ingen avvik/anbefalinger registrert for denne lokasjonen.</p>`;
+    return;
+  }
+
+  root.innerHTML = list.map(it => {
+    const badgeClass = it.type === "AVVIK" ? "avvik" : "anb";
+    const badgeText = it.type === "AVVIK" ? "AVVIK" : "ANBEFALING";
+
+    const meta = [
+      `Ref.nr: ${esc(it.refNo)}`,
+      it.type === "AVVIK" && it.severity ? `Alvorlighet: ${esc(it.severity)}` : "",
+      it.type === "AVVIK" && it.dueDate ? `Frist: ${esc(it.dueDate)}` : ""
+    ].filter(Boolean).join(" • ");
+
+    const photosHtml = (it.photos||[]).map((p, idx) => `
+      <div class="photoRow">
+        <img src="${p.dataUrl}" alt="Bilde">
+        <div>
+          <label>Kommentar til bilde</label>
+          <textarea data-photo-comment="${esc(it.id)}|${idx}" placeholder="Kommentar / hva viser bildet?">${esc(p.comment||"")}</textarea>
+        </div>
+      </div>
+    `).join("");
+
+    return `
+      <div class="dev">
+        <div>
+          <span class="badge ${badgeClass}">${badgeText}</span>
+          <strong style="margin-left:8px;">${esc(it.title)}</strong>
+        </div>
+
+        <div class="itemMeta">${meta}</div>
+
+        ${it.desc ? `<div class="muted" style="margin-top:8px;">${esc(it.desc).replaceAll("\n","<br>")}</div>` : ""}
+
+        ${photosHtml ? `<div class="photoBlock"><strong>Bilder</strong>${photosHtml}</div>` : ""}
+
+        <div class="inline" style="margin-top:12px;">
+          <button class="btn" data-del-item="${esc(it.id)}">Slett</button>
+        </div>
+      </div>
+    `;
+  }).join("");
+
+  // bind delete
+  root.querySelectorAll("[data-del-item]").forEach(btn => {
     btn.addEventListener("click", () => {
-      const id = btn.getAttribute("data-del");
-      state.deviations = state.deviations.filter(x => x.id !== id || x.locationId !== loc.id);
+      const id = btn.getAttribute("data-del-item");
+      state.items = state.items.filter(x => !(x.id === id && x.locationId === loc.id));
       renderLocationTabs();
-      renderDevHeader();
-      renderDevs();
+      renderItemHeader();
+      renderItems();
+    });
+  });
+
+  // bind photo comment updates
+  root.querySelectorAll("textarea[data-photo-comment]").forEach(t => {
+    t.addEventListener("input", () => {
+      const token = t.getAttribute("data-photo-comment");
+      const [itemId, idxStr] = token.split("|");
+      const idx = Number(idxStr);
+
+      const item = state.items.find(x => x.id === itemId && x.locationId === loc.id);
+      if(!item || !item.photos || !item.photos[idx]) return;
+
+      item.photos[idx].comment = t.value;
     });
   });
 }
@@ -476,17 +498,6 @@ function load(){
   if(!raw){ alert("Ingen lagring funnet."); return; }
 
   state = JSON.parse(raw);
-
-  // Migration from older versions where deviations were inside each location:
-  if (!state.deviations && state.locations?.some(l => Array.isArray(l.deviations))) {
-    const migrated = [];
-    state.locations.forEach(l => {
-      (l.deviations || []).forEach(d => migrated.push({ ...d, locationId: l.id }));
-      delete l.deviations;
-    });
-    state.deviations = migrated;
-  }
-
   normalizeState();
 
   $("orgnr").value = state.customer?.orgnr || "";
@@ -508,7 +519,7 @@ function resetAll(){
     customer: { orgnr:"", name:"", orgForm:"", industry:"" },
     locations: [ newLocation("LOC-1") ],
     activeLocationId: "LOC-1",
-    deviations: []
+    items: []
   };
 
   $("orgnr").value = "";
@@ -519,32 +530,106 @@ function resetAll(){
   $("brregStatus").textContent = "BRREG: klar";
 
   renderAddressSuggestions([]);
-  clearDeviationForm();
   renderAll();
 }
 
-/**
- * Reliable export: PDF via browser print engine (images always render).
- * Opens a new tab with the report and triggers print dialog.
- */
+function buildReportHtml({ forPrint }){
+  const dateStr = state.inspectionDate || new Date().toISOString().slice(0,10);
+
+  const imgStyle = "display:block; margin:10px 0; border:1px solid #ddd; border-radius:8px;";
+
+  const printCss = forPrint ? `
+    <style>
+      @page { size: A4; margin: 16mm; }
+      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      h1, h2, h3, h4 { page-break-after: avoid; }
+      .loc { page-break-inside: avoid; }
+      .item { page-break-inside: avoid; }
+      img { page-break-inside: avoid; }
+    </style>
+  ` : "";
+
+  const locBlocks = state.locations.map((l, idx) => {
+    const locTitle = `Lokasjon ${idx+1}`;
+    const addr = l.address || "(adresse ikke valgt)";
+    const gps = (l.geo?.lat && l.geo?.lng)
+      ? `${l.geo.lat.toFixed(5)}, ${l.geo.lng.toFixed(5)} (±${Math.round(l.geo.accuracy||0)}m)`
+      : "ikke hentet";
+
+    const items = getItemsForLocation(l.id);
+    const avvik = items.filter(x => x.type === "AVVIK");
+    const anb = items.filter(x => x.type === "ANBEFALING");
+
+    const renderItem = (it) => {
+      const photos = (it.photos||[]).map(p => {
+        const src = p.reportDataUrl || p.dataUrl;
+        return `
+          <div>
+            <img src="${src}" style="${imgStyle}">
+            ${p.comment ? `<div style="color:#666; font-size:10pt; margin:0 0 8px;"><strong>Kommentar:</strong> ${esc(p.comment)}</div>` : ""}
+          </div>
+        `;
+      }).join("");
+
+      const avvikMeta = it.type === "AVVIK"
+        ? `<div><strong>Alvorlighet:</strong> ${esc(it.severity||"")} &nbsp; <strong>Frist:</strong> ${esc(it.dueDate||"")}</div>`
+        : "";
+
+      return `
+        <div class="item" style="margin:12px 0 0;">
+          <h4 style="margin:0 0 6px;">${esc(it.title)} <span style="color:#666;">(${esc(it.type)})</span></h4>
+          <div style="margin:0 0 6px;"><strong>Ref.nr:</strong> ${esc(it.refNo)}</div>
+          ${avvikMeta}
+          ${it.desc ? `<div style="margin:0 0 8px;"><strong>Beskrivelse:</strong><br>${esc(it.desc).replaceAll("\n","<br>")}</div>` : ""}
+          ${photos}
+        </div>
+        <div style="border-top:1px solid #eee; margin:12px 0;"></div>
+      `;
+    };
+
+    const avvikHtml = avvik.length ? avvik.map(renderItem).join("") : "<div>Ingen avvik.</div>";
+    const anbHtml = anb.length ? anb.map(renderItem).join("") : "<div>Ingen anbefalinger.</div>";
+
+    return `
+      <div class="loc" style="margin-top:18px;">
+        <h2 style="margin:0 0 6px;">${esc(locTitle)} – ${esc(addr)}</h2>
+        <div><strong>GPS:</strong> ${esc(gps)}</div>
+
+        <h3 style="margin:12px 0 8px;">Avvik</h3>
+        ${avvikHtml}
+
+        <h3 style="margin:12px 0 8px;">Anbefalinger</h3>
+        ${anbHtml}
+      </div>
+    `;
+  }).join("");
+
+  return `
+    <!doctype html><html><head><meta charset="utf-8">
+    ${printCss}
+    </head>
+    <body style="font-family:Arial,sans-serif;color:#333; font-size:11pt;">
+      <h1 style="margin:0 0 10px;">Befaringsrapport</h1>
+      <div><strong>Dato:</strong> ${esc(dateStr)}</div>
+      <div><strong>Kunde:</strong> ${esc(state.customer?.name || "")} &nbsp; <strong>Org.nr:</strong> ${esc(state.customer?.orgnr || "")}</div>
+      ${state.customer?.orgForm ? `<div><strong>Org.form:</strong> ${esc(state.customer.orgForm)}</div>` : ""}
+      ${state.customer?.industry ? `<div><strong>Næringskode:</strong> ${esc(state.customer.industry)}</div>` : ""}
+      ${locBlocks}
+    </body></html>
+  `;
+}
+
 function exportPdf(){
   const html = buildReportHtml({ forPrint: true });
   const w = window.open("", "_blank");
-  if (!w) {
-    alert("Kunne ikke åpne nytt vindu. Sjekk popup-blokkering.");
-    return;
-  }
+  if (!w) { alert("Kunne ikke åpne nytt vindu. Sjekk popup-blokkering."); return; }
   w.document.open();
   w.document.write(html);
   w.document.close();
   w.focus();
-  // let the browser finish rendering images
   setTimeout(() => w.print(), 700);
 }
 
-/**
- * Word export: best-effort HTML .doc (can be inconsistent with embedded images in some Word setups).
- */
 function exportWord(){
   const dateStr = state.inspectionDate || new Date().toISOString().slice(0,10);
   const fnameBase = (state.customer?.name || "Befaring")
@@ -568,15 +653,13 @@ async function shareReport(){
   const dateStr = state.inspectionDate || new Date().toISOString().slice(0,10);
   const fnameBase = (state.customer?.name || "Befaring")
     .replace(/[^\w\- ]+/g,"").trim().replace(/\s+/g,"_") || "Befaring";
-  const fname = `${fnameBase}_${dateStr}.doc`;
 
-  // Vi bruker Word-rapporten (HTML .doc) fordi den kan deles som fil-vedlegg
-  // uten ekstra bibliotek. PDF kan vi åpne/print'e, men ikke lage bytes stabilt uten pdf-lib.
+  // Del Word (enklest som fil). PDF kan dere fortsatt gjøre via print->share manuelt.
+  const fname = `${fnameBase}_${dateStr}.doc`;
   const html = buildReportHtml({ forPrint: false });
   const blob = new Blob([html], { type: "application/msword" });
   const file = new File([blob], fname, { type: "application/msword" });
 
-  // Web Share API med filer (Share Sheet) – fungerer på moderne iOS/Android
   try{
     if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
       await navigator.share({
@@ -586,75 +669,15 @@ async function shareReport(){
       });
       return;
     }
-  } catch (e) {
-    // Hvis deling feiler, faller vi tilbake under.
-  }
+  } catch {}
 
-  // Fallback: last ned filen og gi instruks om å legge ved manuelt
   exportWord();
-  alert("Telefonen din støtter ikke deling med vedlegg fra nettleser/PWA. Rapporten er lastet ned – legg den ved manuelt i e-post.");
+  alert("Telefonen støtter ikke deling med vedlegg fra denne nettleseren. Rapporten er lastet ned – legg ved manuelt.");
 }
 
-function buildReportHtml({ forPrint }){
-  const dateStr = state.inspectionDate || new Date().toISOString().slice(0,10);
-
-  // A4 text width safe inside Word/print with normal margins: ~16cm
-  const imgStyle = "display:block; margin:10px 0; border:1px solid #ddd; border-radius:8px; max-width:16cm; height:auto;";
-
-  const printCss = forPrint ? `
-    <style>
-      @page { size: A4; margin: 16mm; }
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      h1, h2, h3, h4 { page-break-after: avoid; }
-      .loc { page-break-inside: avoid; }
-      .dev { page-break-inside: avoid; }
-      img { page-break-inside: avoid; }
-    </style>
-  ` : "";
-
-  const locBlocks = state.locations.map((l, idx) => {
-    const locTitle = `Lokasjon ${idx+1}`;
-    const addr = l.address || "(adresse ikke valgt)";
-    const gps = (l.geo?.lat && l.geo?.lng)
-      ? `${l.geo.lat.toFixed(5)}, ${l.geo.lng.toFixed(5)} (±${Math.round(l.geo.accuracy||0)}m)`
-      : "ikke hentet";
-
-    const devs = getDeviationsForLocation(l.id);
-    const devHtml = devs.length ? devs.map((d, n) => `
-      <div class="dev" style="margin:12px 0 0;">
-        <h4 style="margin:0 0 6px;">${n+1}. ${esc(d.title)} <span style="color:#666;">(${esc(d.severity)})</span></h4>
-        <div style="margin:0 0 6px;"><strong>ID:</strong> ${esc(d.id)}</div>
-        ${d.desc ? `<div style="margin:0 0 6px;"><strong>Beskrivelse:</strong><br>${esc(d.desc).replaceAll("\n","<br>")}</div>` : ""}
-        ${(d.photoReportDataUrl || d.photoDataUrl) ? `<img src="${d.photoReportDataUrl || d.photoDataUrl}" style="${imgStyle}">` : ""}
-      </div>
-      <div style="border-top:1px solid #eee; margin:12px 0;"></div>
-    `).join("") : "<div>Ingen avvik.</div>";
-
-    return `
-      <div class="loc" style="margin-top:18px;">
-        <h2 style="margin:0 0 6px;">${esc(locTitle)} – ${esc(addr)}</h2>
-        <div><strong>GPS:</strong> ${esc(gps)}</div>
-        <h3 style="margin:12px 0 8px;">Avvik</h3>
-        ${devHtml}
-      </div>
-    `;
-  }).join("");
-
-  return `
-    <!doctype html><html><head><meta charset="utf-8">
-    ${printCss}
-    </head>
-    <body style="font-family:Arial,sans-serif;color:#333; font-size:11pt;">
-      <h1 style="margin:0 0 10px;">Befaringsrapport</h1>
-      <div><strong>Dato:</strong> ${esc(dateStr)}</div>
-      <div><strong>Kunde:</strong> ${esc(state.customer?.name || "")} &nbsp; <strong>Org.nr:</strong> ${esc(state.customer?.orgnr || "")}</div>
-      ${state.customer?.orgForm ? `<div><strong>Org.form:</strong> ${esc(state.customer.orgForm)}</div>` : ""}
-      ${state.customer?.industry ? `<div><strong>Næringskode:</strong> ${esc(state.customer.industry)}</div>` : ""}
-      ${locBlocks}
-    </body></html>
-  `;
-}
-
+/**
+ * Leser bilde og begrenser fysisk størrelse (sikrer Word/PDF-layout).
+ */
 function readAsDataUrlConstrained(file, maxW = 1200, maxH = 1200, quality = 0.8){
   return new Promise((resolve, reject) => {
     const img = new Image();
@@ -664,10 +687,8 @@ function readAsDataUrlConstrained(file, maxW = 1200, maxH = 1200, quality = 0.8)
     reader.onerror = () => reject(reader.error);
 
     img.onload = () => {
-      let w = img.width;
-      let h = img.height;
-
-      // Skaler ned slik at både bredde og høyde holder seg innenfor grensene
+      const w = img.width;
+      const h = img.height;
       const scale = Math.min(1, maxW / w, maxH / h);
       const nw = Math.max(1, Math.round(w * scale));
       const nh = Math.max(1, Math.round(h * scale));
@@ -679,9 +700,7 @@ function readAsDataUrlConstrained(file, maxW = 1200, maxH = 1200, quality = 0.8)
       const ctx = canvas.getContext("2d");
       ctx.drawImage(img, 0, 0, nw, nh);
 
-      // JPEG gir ofte mye mindre filer + bedre kompatibilitet i rapport
-      const dataUrl = canvas.toDataURL("image/jpeg", quality);
-      resolve(dataUrl);
+      resolve(canvas.toDataURL("image/jpeg", quality));
     };
 
     img.onerror = () => reject(new Error("Kunne ikke lese bilde"));

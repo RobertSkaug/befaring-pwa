@@ -95,37 +95,54 @@
 
   <section class="card">
     <div class="devHeader">
-      <h2 id="devHeaderTitle" style="margin:0;">Avvik</h2>
+      <h2 id="devHeaderTitle" style="margin:0;">Punkt</h2>
       <div class="muted" id="devHeaderSub"></div>
     </div>
 
     <div class="row">
       <div>
-        <label>Tittel</label>
-        <input id="devTitle" placeholder="Kort beskrivelse" />
-      </div>
-      <div>
-        <label>Alvorlighet</label>
-        <select id="devSeverity">
-          <option>Høy</option>
-          <option selected>Middels</option>
-          <option>Lav</option>
+        <label>Type</label>
+        <select id="itemType">
+          <option value="AVVIK" selected>Avvik</option>
+          <option value="ANBEFALING">Anbefaling</option>
         </select>
       </div>
+      <div>
+        <label>Ref.nr (auto)</label>
+        <input id="itemRef" disabled />
+      </div>
     </div>
+
+    <div class="row">
+      <div>
+        <label>Alvorlighet (kun avvik)</label>
+        <select id="itemSeverity">
+          <option value="Høy">Høy</option>
+          <option value="Middels" selected>Middels</option>
+          <option value="Lav">Lav</option>
+        </select>
+      </div>
+      <div>
+        <label>Frist for tilbakemelding (kun avvik)</label>
+        <input id="itemDue" type="date" />
+      </div>
+    </div>
+
+    <label>Tittel</label>
+    <input id="itemTitle" placeholder="Kort beskrivelse" />
 
     <label>Beskrivelse</label>
-    <textarea id="devDesc" placeholder="Hva er observert?"></textarea>
+    <textarea id="itemDesc" placeholder="Hva er observert? Hva anbefales?"></textarea>
 
-    <label>Bilde (kamera)</label>
-    <input id="devPhoto" type="file" accept="image/*" capture="environment">
+    <label>Bilder (flere)</label>
+    <input id="itemPhotos" type="file" accept="image/*" capture="environment" multiple>
 
     <div class="inline">
-      <button class="btn primary" id="btnAddDev">Legg til avvik</button>
-      <span class="muted">Bilder komprimeres og tilpasses i rapport.</span>
+      <button class="btn primary" id="btnAddItem">Legg til</button>
+      <span class="muted">Du kan legge til flere bilder og kommentere per bilde etterpå.</span>
     </div>
 
-    <div id="devList"></div>
+    <div id="itemList"></div>
   </section>
 </main>
 
