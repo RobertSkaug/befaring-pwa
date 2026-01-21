@@ -245,8 +245,26 @@ function getGPS(){
   }, { enableHighAccuracy:true, timeout:12000, maximumAge:15000 });
 }
 
+const addrCache = new Map(); // key -> { t, list }
+const ADDR_CACHE_TTL_MS = 2 * 60 * 1000; // 2 minutter
+
+function cacheKey(lat, lng){
+  // avrund til ca 20–30m rutenett for stabil cache
+  const r = (x) => Math.round(x * 4000) / 4000; // ~0.00025
+  return `${r(lat)},${r(lng)}`;
+}
+
 async function fetchAddressSuggestions(lat, lng){
-  const d = 0.00025; // ~25–30 meter
+  // 1) Cache (super effekt i felt)
+  const key = cacheKey(lat, lng);
+  const cached = addrCache.get(key);
+  if (cached && (Date.now() - cached.t) < ADDR_CACHE_TTL_MS) {
+    return cached.list;
+  }
+
+  // 2) Færre punkt hvis GPS er "grovere" (valgfritt, men raskt)
+  // Du kan justere d eller antall punkter om du vil.
+  const d = 0.00025; // ~25–30m
   const points = [
     {lat, lng},
     {lat: lat + d, lng},
@@ -255,26 +273,27 @@ async function fetchAddressSuggestions(lat, lng){
     {lat, lng: lng - d}
   ];
 
-  const results = [];
-  for (let i = 0; i < points.length; i++) {
-    const p = points[i];
-    try{
-      const r = await reverseGeocodeNominatim(p.lat, p.lng);
-      if (r) results.push(r);
-    } catch {}
-    await sleep(250);
-  }
+  // 3) Parallell oppslag med timeout (rask, men ikke "henger")
+  const tasks = points.map(p => reverseGeocodeNominatimWithTimeout(p.lat, p.lng, 2200));
+  const settled = await Promise.allSettled(tasks);
 
+  const results = settled
+    .filter(x => x.status === "fulfilled" && x.value)
+    .map(x => x.value);
+
+  // Dedupe på display_name
   const seen = new Set();
   const unique = [];
   for (const r of results) {
-    const key = r.display_name;
-    if (!key || seen.has(key)) continue;
-    seen.add(key);
+    const name = r.display_name;
+    if (!name || seen.has(name)) continue;
+    seen.add(name);
     unique.push(r);
   }
 
-  return unique.slice(0, 6);
+  const list = unique.slice(0, 6);
+  addrCache.set(key, { t: Date.now(), list });
+  return list;
 }
 
 async function reverseGeocodeNominatim(lat, lng){
@@ -295,6 +314,38 @@ async function reverseGeocodeNominatim(lat, lng){
     line1: line1 || data.display_name,
     line2: line2 || ""
   };
+}
+
+async function reverseGeocodeNominatimWithTimeout(lat, lng, timeoutMs = 2200){
+  const controller = new AbortController();
+  const timeoutId = setTimeout(() => controller.abort(), timeoutMs);
+
+  try {
+    const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&addressdetails=1`;
+    const res = await fetch(url, {
+      headers: { "Accept":"application/json" },
+      signal: controller.signal
+    });
+    if(!res.ok) return null;
+
+    const data = await res.json();
+    if(!data || !data.display_name) return null;
+
+    const a = data.address || {};
+    const line1 = [a.road, a.house_number].filter(Boolean).join(" ").trim();
+    const city = a.city || a.town || a.village || a.municipality || "";
+    const line2 = [a.postcode, city].filter(Boolean).join(" ").trim();
+
+    return {
+      display_name: data.display_name,
+      line1: line1 || data.display_name,
+      line2: line2 || ""
+    };
+  } catch {
+    return null;
+  } finally {
+    clearTimeout(timeoutId);
+  }
 }
 
 function renderAddressSuggestions(list){
