@@ -1,14 +1,10 @@
-const STORAGE_KEY = "befaring_state_v2";
+const STORAGE_KEY = "befaring_state_v3";
 const BRREG_URL = "https://data.brreg.no/enhetsregisteret/api/enheter";
 
 let state = {
   inspectionDate: new Date().toISOString().slice(0,10),
   customer: { orgnr:"", name:"", orgForm:"", industry:"" },
-
-  // NYTT: flere lokasjoner
-  locations: [
-    newLocation("LOC-1")
-  ],
+  locations: [ newLocation("LOC-1") ],
   activeLocationId: "LOC-1"
 };
 
@@ -23,12 +19,19 @@ function newLocation(id){
     id,
     address: "",
     geo: { lat:null, lng:null, accuracy:null, ts:null },
-    deviations: [] // {id,title,severity,desc,photoDataUrl}
+    deviations: []
   };
 }
 
 function getActiveLocation(){
   return state.locations.find(l => l.id === state.activeLocationId) || state.locations[0];
+}
+
+function shortAddress(addr, fallback){
+  const s = (addr || "").trim();
+  if (!s) return fallback;
+  // keep first 50 chars, but avoid ugly cuts
+  return s.length > 50 ? s.slice(0, 47) + "…" : s;
 }
 
 function init(){
@@ -44,11 +47,13 @@ function init(){
   $("address").addEventListener("input", e => {
     const loc = getActiveLocation();
     loc.address = e.target.value;
+    // update tabs label as you type
+    renderLocationTabs();
+    renderDevHeader();
   });
 
   $("btnGPS").addEventListener("click", getGPS);
   $("btnAddDev").addEventListener("click", addDeviation);
-
   $("btnAddLocation").addEventListener("click", addLocation);
 
   $("btnSave").addEventListener("click", save);
@@ -60,19 +65,16 @@ function init(){
 }
 
 function addLocation(){
-  const nextNr = state.locations.length + 1;
-  const id = `LOC-${nextNr}`;
+  const id = `LOC-${state.locations.length + 1}`;
   state.locations.push(newLocation(id));
   state.activeLocationId = id;
-
-  // rydd forslag ved bytte
   renderAddressSuggestions([]);
-
   renderAll();
 }
 
 function setActiveLocation(id){
   state.activeLocationId = id;
+  // clear suggestions when switching location, so you don’t accidentally pick the wrong one
   renderAddressSuggestions([]);
   renderAll();
 }
@@ -91,23 +93,38 @@ function renderAll(){
     $("gpsStatus").textContent = "GPS: ikke hentet";
   }
 
+  renderDevHeader();
   renderDevs();
 }
 
 function renderLocationTabs(){
   const root = $("locTabs");
-  const locs = state.locations;
-
-  root.innerHTML = locs.map((l, idx) => {
-    const active = l.id === state.activeLocationId ? "active" : "";
-    const label = `Lokasjon ${idx+1}`;
-    const hasAddr = l.address ? "•" : "";
-    return `<button class="locTab ${active}" data-loc="${esc(l.id)}">${esc(label)} <span class="small">${esc(hasAddr)}</span></button>`;
+  root.innerHTML = state.locations.map((l, idx) => {
+    const active = (l.id === state.activeLocationId) ? "active" : "";
+    const fallback = `Lokasjon ${idx+1}`;
+    const label = shortAddress(l.address, fallback);
+    const count = (l.deviations || []).length;
+    return `
+      <button class="locTab ${active}" data-loc="${esc(l.id)}" title="${esc(l.address || fallback)}">
+        <span class="locTab__label">${esc(label)}</span>
+        <span class="locTab__count">(${count})</span>
+      </button>`;
   }).join("");
 
   root.querySelectorAll("[data-loc]").forEach(btn => {
     btn.addEventListener("click", () => setActiveLocation(btn.getAttribute("data-loc")));
   });
+}
+
+function renderDevHeader(){
+  const loc = getActiveLocation();
+  const idx = state.locations.findIndex(x => x.id === loc.id);
+  const locName = `Lokasjon ${idx + 1}`;
+  const addr = loc.address ? loc.address : "(adresse ikke valgt)";
+  const count = (loc.deviations || []).length;
+
+  $("devHeaderTitle").textContent = `Avvik – ${locName}`;
+  $("devHeaderSub").textContent = `${addr} • ${count} avvik`;
 }
 
 async function onOrgnr(e){
@@ -265,7 +282,10 @@ function renderAddressSuggestions(list){
       $("address").value = picked.display_name;
 
       $("addrBox").style.display = "none";
-      renderAll();
+
+      // update UI that depends on address
+      renderLocationTabs();
+      renderDevHeader();
     });
   });
 }
@@ -284,16 +304,19 @@ async function addDeviation(){
   let photoDataUrl = "";
   const file = $("devPhoto").files?.[0];
   if (file) {
-    // Komprimer bildet for å unngå gigantiske rapporter
-    photoDataUrl = await readAsDataUrlCompressed(file, 1280, 0.82);
+    // More conservative for Word: smaller maxDim + quality
+    photoDataUrl = await readAsDataUrlCompressed(file, 1100, 0.78);
   }
 
-  const id = `AV-${String(loc.deviations.length+1).padStart(6,"0")}`;
+  const id = `AV-${String(loc.deviations.length+1).padStart(4,"0")}`;
   loc.deviations.push({ id, title, severity, desc, photoDataUrl });
 
   $("devTitle").value = "";
   $("devDesc").value = "";
   $("devPhoto").value = "";
+
+  renderLocationTabs();
+  renderDevHeader();
   renderDevs();
 }
 
@@ -321,6 +344,8 @@ function renderDevs(){
     btn.addEventListener("click", () => {
       const id = btn.getAttribute("data-del");
       loc.deviations = loc.deviations.filter(x => x.id !== id);
+      renderLocationTabs();
+      renderDevHeader();
       renderDevs();
     });
   });
@@ -341,7 +366,7 @@ function load(){
 
   state = JSON.parse(raw);
 
-  // Backward-compat: hvis gammel state mangler locations
+  // Backward compat
   if (!state.locations || !state.locations.length) {
     state.locations = [ newLocation("LOC-1") ];
     state.activeLocationId = "LOC-1";
@@ -386,28 +411,33 @@ function exportWord(){
     .replace(/[^\w\- ]+/g,"").trim().replace(/\s+/g,"_") || "Befaring";
   const fname = `${fnameBase}_${dateStr}.doc`;
 
-  // A4-vennlig bildeformat: max bredde og auto høyde
-  const imgStyle = "width:100%; max-width:600px; height:auto; display:block; margin:10px 0; border:1px solid #ddd; border-radius:10px;";
+  // Word-safe “text width” for A4 with margins: ~16cm
+  const imgStyle = "width:100%; max-width:16cm; height:auto; display:block; margin:10px 0; border:1px solid #ddd; border-radius:8px;";
 
   const locBlocks = state.locations.map((l, idx) => {
     const locTitle = `Lokasjon ${idx+1}`;
-    const addr = l.address || "(adresse ikke satt)";
-    const gps = (l.geo?.lat && l.geo?.lng) ? `${l.geo.lat.toFixed(5)}, ${l.geo.lng.toFixed(5)} (±${Math.round(l.geo.accuracy||0)}m)` : "ikke hentet";
+    const addr = l.address || "(adresse ikke valgt)";
+    const gps = (l.geo?.lat && l.geo?.lng)
+      ? `${l.geo.lat.toFixed(5)}, ${l.geo.lng.toFixed(5)} (±${Math.round(l.geo.accuracy||0)}m)`
+      : "ikke hentet";
 
-    const devs = (l.deviations || []).map(d => `
-      <h4 style="margin:14px 0 6px;">Avvik ${esc(d.id)} – ${esc(d.title)}</h4>
-      <div><strong>Alvorlighet:</strong> ${esc(d.severity)}</div>
-      ${d.desc ? `<div><strong>Beskrivelse:</strong><br>${esc(d.desc).replaceAll("\n","<br>")}</div>` : ""}
-      ${d.photoDataUrl ? `<img src="${d.photoDataUrl}" style="${imgStyle}">` : ""}
+    const devs = (l.deviations || []).map((d, n) => `
+      <div style="margin:12px 0 0;">
+        <h4 style="margin:0 0 6px;">${n+1}. ${esc(d.title)} <span style="color:#666;">(${esc(d.severity)})</span></h4>
+        <div style="margin:0 0 6px;"><strong>ID:</strong> ${esc(d.id)}</div>
+        ${d.desc ? `<div style="margin:0 0 6px;"><strong>Beskrivelse:</strong><br>${esc(d.desc).replaceAll("\n","<br>")}</div>` : ""}
+        ${d.photoDataUrl ? `<img src="${d.photoDataUrl}" style="${imgStyle}">` : ""}
+      </div>
+      <div style="border-top:1px solid #eee; margin:12px 0;"></div>
     `).join("") || "<div>Ingen avvik.</div>";
 
     return `
-      <hr style="border:none; border-top:2px solid #eee; margin:18px 0;">
-      <h2 style="margin:0 0 8px;">${esc(locTitle)}</h2>
-      <div><strong>Adresse:</strong> ${esc(addr)}</div>
-      <div><strong>GPS:</strong> ${esc(gps)}</div>
-      <h3 style="margin:14px 0 8px;">Avvik</h3>
-      ${devs}
+      <div style="page-break-inside:avoid; margin-top:18px;">
+        <h2 style="margin:0 0 6px;">${esc(locTitle)} – ${esc(addr)}</h2>
+        <div><strong>GPS:</strong> ${esc(gps)}</div>
+        <h3 style="margin:12px 0 8px;">Avvik</h3>
+        ${devs}
+      </div>
     `;
   }).join("");
 
@@ -434,11 +464,7 @@ function exportWord(){
   URL.revokeObjectURL(url);
 }
 
-/**
- * Leser bilde og komprimerer (nedskalering + JPEG quality).
- * maxDim: maks bredde/høyde (px). quality: 0..1
- */
-function readAsDataUrlCompressed(file, maxDim = 1280, quality = 0.82){
+function readAsDataUrlCompressed(file, maxDim = 1100, quality = 0.78){
   return new Promise((resolve, reject) => {
     const img = new Image();
     const reader = new FileReader();

@@ -66,7 +66,6 @@
       <button class="btn primary" id="btnAddLocation">+ Ny lokasjon</button>
     </div>
 
-    <!-- Faner for lokasjoner -->
     <div id="locTabs" class="locTabs"></div>
 
     <div class="row">
@@ -85,7 +84,6 @@
       <span class="pill"><span class="dot green"></span><span id="gpsStatus">GPS: ikke hentet</span></span>
     </div>
 
-    <!-- Adresseforslag -->
     <div id="addrBox" class="addrBox" style="display:none;">
       <div class="addrBox__title">Forslag til adresse nær deg</div>
       <div id="addrSuggestions" class="addrBox__list"></div>
@@ -94,7 +92,10 @@
   </section>
 
   <section class="card">
-    <h2>Avvik (for valgt lokasjon)</h2>
+    <div class="devHeader">
+      <h2 id="devHeaderTitle" style="margin:0;">Avvik</h2>
+      <div class="muted" id="devHeaderSub"></div>
+    </div>
 
     <div class="row">
       <div>
@@ -119,7 +120,7 @@
 
     <div class="inline">
       <button class="btn primary" id="btnAddDev">Legg til avvik</button>
-      <span class="muted">Merk: Bilder komprimeres for rapport.</span>
+      <span class="muted">Bilder komprimeres og tilpasses i rapport.</span>
     </div>
 
     <div id="devList"></div>
