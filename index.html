@@ -1,0 +1,123 @@
+<!doctype html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Befaring</title>
+
+  <link rel="manifest" href="./manifest.webmanifest">
+  <meta name="theme-color" content="#3D3D3D">
+  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+
+  <link rel="stylesheet" href="./styles.css">
+</head>
+<body>
+<header class="header">
+  <div class="wrap header__bar">
+    <div class="brand">
+      <div class="logo">B</div>
+      <div>
+        <div class="t1">Befaring</div>
+        <div class="t2">PWA • iPhone + Android</div>
+      </div>
+    </div>
+    <div class="actions">
+      <button class="btn" id="btnSave">Lagre</button>
+      <button class="btn" id="btnLoad">Last</button>
+      <button class="btn danger" id="btnReset">Nullstill</button>
+      <button class="btn primary" id="btnExport">Eksporter Word</button>
+    </div>
+  </div>
+</header>
+
+<main class="wrap">
+  <section class="card">
+    <h2>Kunde (BRREG)</h2>
+    <p class="muted">Skriv org.nr (9 siffer) for oppslag.</p>
+
+    <div class="row">
+      <div>
+        <label>Org.nr</label>
+        <input id="orgnr" inputmode="numeric" placeholder="9 siffer" />
+      </div>
+      <div>
+        <label>Kundenavn</label>
+        <input id="customerName" placeholder="Fylles fra BRREG" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Organisasjonsform</label>
+        <input id="orgForm" placeholder="Fylles fra BRREG" />
+      </div>
+      <div>
+        <label>Næringskode</label>
+        <input id="industry" placeholder="Fylles hvis tilgjengelig" />
+      </div>
+    </div>
+
+    <div class="status" id="brregStatus">BRREG: klar</div>
+  </section>
+
+  <section class="card">
+    <h2>Lokasjon</h2>
+    <div class="row">
+      <div>
+        <label>Adresse</label>
+        <input id="address" placeholder="Skriv adresse (MVP)" />
+      </div>
+      <div>
+        <label>Dato</label>
+        <input id="inspectionDate" type="date" />
+      </div>
+    </div>
+
+    <div class="inline">
+      <button class="btn" id="btnGPS">Hent GPS</button>
+      <span class="pill"><span class="dot green"></span><span id="gpsStatus">GPS: ikke hentet</span></span>
+    </div>
+  </section>
+
+  <section class="card">
+    <h2>Avvik</h2>
+
+    <div class="row">
+      <div>
+        <label>Tittel</label>
+        <input id="devTitle" placeholder="Kort beskrivelse" />
+      </div>
+      <div>
+        <label>Alvorlighet</label>
+        <select id="devSeverity">
+          <option>Høy</option>
+          <option selected>Middels</option>
+          <option>Lav</option>
+        </select>
+      </div>
+    </div>
+
+    <label>Beskrivelse</label>
+    <textarea id="devDesc" placeholder="Hva er observert?"></textarea>
+
+    <label>Bilde (kamera)</label>
+    <input id="devPhoto" type="file" accept="image/*" capture="environment">
+
+    <div class="inline">
+      <button class="btn primary" id="btnAddDev">Legg til avvik</button>
+      <span class="muted">Merk: bilder lagres lokalt i MVP.</span>
+    </div>
+
+    <div id="devList"></div>
+  </section>
+</main>
+
+<script>
+  // PWA/service worker
+  if ("serviceWorker" in navigator) {
+    navigator.serviceWorker.register("./sw.js").catch(()=>{});
+  }
+</script>
+<script src="./app.js"></script>
+</body>
+</html>
