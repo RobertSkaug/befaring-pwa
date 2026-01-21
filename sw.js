@@ -1,4 +1,4 @@
-const CACHE = "befaring-pwa-v6";
+const CACHE = "befaring-pwa-v7";
 const ASSETS = [
   "./",
   "./index.html",

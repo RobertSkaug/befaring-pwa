@@ -101,6 +101,7 @@ function init(){
 
   $("btnExport").addEventListener("click", exportWord);
   $("btnExportPdf").addEventListener("click", exportPdf);
+  $("btnShare").addEventListener("click", shareReport);
 
   renderAll();
 }
@@ -502,6 +503,37 @@ function exportWord(){
   a.click();
   a.remove();
   URL.revokeObjectURL(url);
+}
+
+async function shareReport(){
+  const dateStr = state.inspectionDate || new Date().toISOString().slice(0,10);
+  const fnameBase = (state.customer?.name || "Befaring")
+    .replace(/[^\w\- ]+/g,"").trim().replace(/\s+/g,"_") || "Befaring";
+  const fname = `${fnameBase}_${dateStr}.doc`;
+
+  // Vi bruker Word-rapporten (HTML .doc) fordi den kan deles som fil-vedlegg
+  // uten ekstra bibliotek. PDF kan vi åpne/print'e, men ikke lage bytes stabilt uten pdf-lib.
+  const html = buildReportHtml({ forPrint: false });
+  const blob = new Blob([html], { type: "application/msword" });
+  const file = new File([blob], fname, { type: "application/msword" });
+
+  // Web Share API med filer (Share Sheet) – fungerer på moderne iOS/Android
+  try{
+    if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
+      await navigator.share({
+        title: "Befaringsrapport",
+        text: "Se vedlagt befaringrapport.",
+        files: [file]
+      });
+      return;
+    }
+  } catch (e) {
+    // Hvis deling feiler, faller vi tilbake under.
+  }
+
+  // Fallback: last ned filen og gi instruks om å legge ved manuelt
+  exportWord();
+  alert("Telefonen din støtter ikke deling med vedlegg fra nettleser/PWA. Rapporten er lastet ned – legg den ved manuelt i e-post.");
 }
 
 function buildReportHtml({ forPrint }){
