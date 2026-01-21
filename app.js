@@ -347,10 +347,17 @@ async function addDeviation(){
   const desc = $("devDesc").value.trim();
 
   let photoDataUrl = "";
+  let photoReportDataUrl = "";
   const file = $("devPhoto").files?.[0];
+
   if (file) {
-    // conservative to keep Word/PDF light and reliable
-    photoDataUrl = await readAsDataUrlCompressed(file, 1200, 0.78);
+    // 1) App-bilde (greit kompromiss mellom kvalitet og størrelse)
+    photoDataUrl = await readAsDataUrlConstrained(file, 1400, 1400, 0.80);
+
+    // 2) Rapport-bilde (hard begrenset: bredde/ høyde)
+    // 16cm x 10cm i Word tilsvarer typisk rundt 600–700px x 380–450px i praksis.
+    // Vi bruker litt romslig margin her, men holder høyden tydelig nede.
+    photoReportDataUrl = await readAsDataUrlConstrained(file, 900, 550, 0.80);
   }
 
   const deviation = {
@@ -360,6 +367,7 @@ async function addDeviation(){
     severity,
     desc,
     photoDataUrl,
+    photoReportDataUrl,
     createdAt: new Date().toISOString()
   };
 
@@ -540,7 +548,7 @@ function buildReportHtml({ forPrint }){
   const dateStr = state.inspectionDate || new Date().toISOString().slice(0,10);
 
   // A4 text width safe inside Word/print with normal margins: ~16cm
-  const imgStyle = "max-width:16cm; max-height:10cm; width:auto; height:auto; display:block; margin:10px 0; border:1px solid #ddd; border-radius:8px;";
+  const imgStyle = "display:block; margin:10px 0; border:1px solid #ddd; border-radius:8px; max-width:16cm; height:auto;";
 
   const printCss = forPrint ? `
     <style>
@@ -566,7 +574,7 @@ function buildReportHtml({ forPrint }){
         <h4 style="margin:0 0 6px;">${n+1}. ${esc(d.title)} <span style="color:#666;">(${esc(d.severity)})</span></h4>
         <div style="margin:0 0 6px;"><strong>ID:</strong> ${esc(d.id)}</div>
         ${d.desc ? `<div style="margin:0 0 6px;"><strong>Beskrivelse:</strong><br>${esc(d.desc).replaceAll("\n","<br>")}</div>` : ""}
-        ${d.photoDataUrl ? `<img src="${d.photoDataUrl}" style="${imgStyle}">` : ""}
+        ${(d.photoReportDataUrl || d.photoDataUrl) ? `<img src="${d.photoReportDataUrl || d.photoDataUrl}" style="${imgStyle}">` : ""}
       </div>
       <div style="border-top:1px solid #eee; margin:12px 0;"></div>
     `).join("") : "<div>Ingen avvik.</div>";
@@ -596,7 +604,7 @@ function buildReportHtml({ forPrint }){
   `;
 }
 
-function readAsDataUrlCompressed(file, maxDim = 1200, quality = 0.78){
+function readAsDataUrlConstrained(file, maxW = 1200, maxH = 1200, quality = 0.8){
   return new Promise((resolve, reject) => {
     const img = new Image();
     const reader = new FileReader();
@@ -608,17 +616,19 @@ function readAsDataUrlCompressed(file, maxDim = 1200, quality = 0.78){
       let w = img.width;
       let h = img.height;
 
-      const scale = Math.min(1, maxDim / Math.max(w, h));
-      w = Math.round(w * scale);
-      h = Math.round(h * scale);
+      // Skaler ned slik at både bredde og høyde holder seg innenfor grensene
+      const scale = Math.min(1, maxW / w, maxH / h);
+      const nw = Math.max(1, Math.round(w * scale));
+      const nh = Math.max(1, Math.round(h * scale));
 
       const canvas = document.createElement("canvas");
-      canvas.width = w;
-      canvas.height = h;
+      canvas.width = nw;
+      canvas.height = nh;
 
       const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, w, h);
+      ctx.drawImage(img, 0, 0, nw, nh);
 
+      // JPEG gir ofte mye mindre filer + bedre kompatibilitet i rapport
       const dataUrl = canvas.toDataURL("image/jpeg", quality);
       resolve(dataUrl);
     };
