@@ -3,11 +3,10 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Befaring</title>
+  <title>Befaringsapp</title>
 
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#3D3D3D">
-  <link rel="apple-touch-icon" sizes="180x180" href="./apple-touch-icon.png">
 
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -17,25 +16,29 @@
     <div class="brand">
       <div class="logo">B</div>
       <div>
-        <div class="t1">Befaring</div>
-        <div class="t2">PWA • iPhone + Android</div>
+        <div class="t1">Befaringsrapport</div>
+        <div class="t2" id="todayLabel">Risikogjennomgang</div>
       </div>
     </div>
     <div class="actions">
-      <button class="btn" id="btnSave">Lagre</button>
-      <button class="btn" id="btnLoad">Last</button>
-      <button class="btn danger" id="btnReset">Nullstill</button>
-      <button class="btn" id="btnExportPdf">Eksporter PDF</button>
-      <button class="btn" id="btnShare">Send rapport</button>
-      <button class="btn primary" id="btnExport">Eksporter Word</button>
+      <button class="btn" id="btnBackToLanding" style="display:none;">Til start</button>
+      <button class="btn" id="btnGoLocations" style="display:none;">Lokasjoner</button>
+      <button class="btn" id="btnGoFindings" style="display:none;">Avvik/Anbefaling</button>
     </div>
   </div>
 </header>
 
 <main class="wrap">
-  <section class="card">
-    <h2>Kunde (BRREG)</h2>
-    <p class="muted">Skriv org.nr (9 siffer) for oppslag.</p>
+
+  <!-- TRINN 0: LANDING -->
+  <section class="card" id="stepLanding">
+    <h1 style="margin:0 0 6px;">Befaringsrapport – Risikogjennomgang</h1>
+    <div class="muted" id="landingDate"></div>
+
+    <hr style="margin:14px 0; border:none; border-top:1px solid #eee;">
+
+    <h2>Kunde / eier av bygg (BRREG)</h2>
+    <p class="muted">Søk med org.nr (9 siffer) eller navn. Velg riktig treff.</p>
 
     <div class="row">
       <div>
@@ -43,28 +46,74 @@
         <input id="orgnr" inputmode="numeric" placeholder="9 siffer" />
       </div>
       <div>
+        <label>Søk på navn</label>
+        <input id="companySearch" placeholder="F.eks. 'Oslo kommune' / 'ABC AS'" />
+      </div>
+    </div>
+
+    <div class="inline">
+      <button class="btn" id="btnSearchBrreg">Søk</button>
+      <span class="status" id="brregStatus">BRREG: klar</span>
+    </div>
+
+    <div id="brregResults" class="addrBox" style="display:none;">
+      <div class="addrBox__title">Treff fra BRREG (velg)</div>
+      <div id="brregList" class="addrBox__list"></div>
+    </div>
+
+    <div class="row" style="margin-top:12px;">
+      <div>
         <label>Kundenavn</label>
         <input id="customerName" placeholder="Fylles fra BRREG" />
+      </div>
+      <div>
+        <label>Organisasjonsform</label>
+        <input id="orgForm" placeholder="Fylles fra BRREG" />
       </div>
     </div>
 
     <div class="row">
       <div>
-        <label>Organisasjonsform</label>
-        <input id="orgForm" placeholder="Fylles fra BRREG" />
-      </div>
-      <div>
         <label>Næringskode</label>
         <input id="industry" placeholder="Fylles hvis tilgjengelig" />
       </div>
+      <div>
+        <label>Befaringsdato</label>
+        <input id="inspectionDate" type="date" />
+      </div>
     </div>
 
-    <div class="status" id="brregStatus">BRREG: klar</div>
+    <hr style="margin:14px 0; border:none; border-top:1px solid #eee;">
+
+    <h2>Deltakere</h2>
+
+    <div class="split">
+      <div class="subcard">
+        <div class="subhead">
+          <h3 style="margin:0;">KLP</h3>
+          <button class="btn" id="btnAddKlp">+ Legg til</button>
+        </div>
+        <div id="klpAttendees"></div>
+      </div>
+
+      <div class="subcard">
+        <div class="subhead">
+          <h3 style="margin:0;">Kunde</h3>
+          <button class="btn" id="btnAddCustomerAtt">+ Legg til</button>
+        </div>
+        <div id="customerAttendees"></div>
+      </div>
+    </div>
+
+    <div class="footerActions">
+      <button class="btn primary" id="btnStartInspection">Start befaring</button>
+    </div>
   </section>
 
-  <section class="card">
+  <!-- TRINN 1: LOKASJONER + GPS + BYGGINFO -->
+  <section class="card" id="stepLocations" style="display:none;">
     <div class="locHeader">
-      <h2 style="margin:0;">Lokasjoner</h2>
+      <h2 style="margin:0;">Lokasjoner (flere objekter)</h2>
       <button class="btn primary" id="btnAddLocation">+ Ny lokasjon</button>
     </div>
 
@@ -72,17 +121,17 @@
 
     <div class="row">
       <div>
-        <label>Adresse</label>
-        <input id="address" placeholder="Velg fra forslag eller skriv manuelt" />
+        <label>Objektnavn (valgfritt)</label>
+        <input id="objectName" placeholder="F.eks. Bygg A / Lager / Skolebygg" />
       </div>
       <div>
-        <label>Dato</label>
-        <input id="inspectionDate" type="date" />
+        <label>Adresse (velg fra forslag)</label>
+        <input id="address" placeholder="Adresse" />
       </div>
     </div>
 
     <div class="inline">
-      <button class="btn" id="btnGPS">Hent GPS</button>
+      <button class="btn" id="btnGPS">Hent GPS + foreslå adresser</button>
       <span class="pill"><span class="dot green"></span><span id="gpsStatus">GPS: ikke hentet</span></span>
     </div>
 
@@ -91,59 +140,155 @@
       <div id="addrSuggestions" class="addrBox__list"></div>
       <div class="muted">Velg riktig adresse. Du kan fortsatt redigere manuelt.</div>
     </div>
-  </section>
 
-  <section class="card">
-    <div class="devHeader">
-      <h2 id="devHeaderTitle" style="margin:0;">Punkt</h2>
-      <div class="muted" id="devHeaderSub"></div>
+    <hr style="margin:16px 0; border:none; border-top:1px solid #eee;">
+
+    <div class="locHeader">
+      <h3 style="margin:0;">Bygg på denne lokasjonen</h3>
+      <button class="btn primary" id="btnAddBuilding">+ Nytt bygg</button>
+    </div>
+
+    <div id="buildingTabs" class="locTabs"></div>
+
+    <div class="row">
+      <div>
+        <label>Byggbeskrivelse (heading)</label>
+        <input id="buildingLabel" placeholder="F.eks. Hovedbygg / Lagerbygg / Verksted" />
+      </div>
+      <div>
+        <label>Bygningsnummer</label>
+        <input id="buildingNo" placeholder="Bygningsnummer" />
+      </div>
+    </div>
+
+    <hr style="margin:16px 0; border:none; border-top:1px solid #eee;">
+
+    <h3>1. Beskrivelse av bygg (for valgt lokasjon)</h3>
+
+    <div class="row">
+      <div>
+        <label>Virksomhet i bygg</label>
+        <input id="businessInBuilding" placeholder="F.eks. museum, lager, kontor…" />
+      </div>
+    </div>
+
+    <div class="inline">
+      <button class="btn" id="btnSuggestBusiness">Foreslå virksomhet (offentlige kilder)</button>
+      <span class="muted" id="businessStatus"></span>
+    </div>
+
+    <div id="businessSuggestions" class="addrBox" style="display:none;">
+      <div class="addrBox__title">Forslag (velg ett)</div>
+      <div id="businessList" class="addrBox__list"></div>
     </div>
 
     <div class="row">
       <div>
+        <label>Byggeår</label>
+        <input id="buildYear" inputmode="numeric" placeholder="År" />
+      </div>
+      <div>
+        <label>Areal (m²)</label>
+        <input id="areaM2" inputmode="numeric" placeholder="m²" />
+      </div>
+    </div>
+
+    <div class="row">
+      <div>
+        <label>Antall etg.</label>
+        <input id="floors" inputmode="numeric" placeholder="Antall" />
+      </div>
+      <div></div>
+    </div>
+
+    <label>Bygningsmaterialer</label>
+    <div class="chips" id="matChips"></div>
+
+    <label>Beskyttelse</label>
+    <div class="chips" id="protChips"></div>
+
+    <h4 style="margin-top:14px;">Konstruksjon</h4>
+    <div class="row">
+      <div><label>Søyler</label><input id="columns" placeholder="F.eks. Betong / Stål" /></div>
+      <div><label>Bjelker</label><input id="beams" placeholder="F.eks. Stål" /></div>
+    </div>
+    <div class="row">
+      <div><label>Dekke</label><input id="deck" placeholder="F.eks. Betong" /></div>
+      <div><label>Tak</label><input id="roof" placeholder="F.eks. Tre / Stålplater" /></div>
+    </div>
+    <div class="row">
+      <div><label>Yttervegg</label><input id="outerWall" placeholder="F.eks. Sandwich / Mur" /></div>
+      <div></div>
+    </div>
+
+    <label>Bygningsbeskrivelse</label>
+    <textarea id="bDesc"></textarea>
+
+    <label>Sikkerhetsforhold</label>
+    <textarea id="bSafety"></textarea>
+
+    <label>Generell vurdering av risiko</label>
+    <textarea id="bRisk"></textarea>
+
+    <div class="footerActions">
+      <button class="btn" id="btnToFindings">Neste: Avvik/Anbefaling</button>
+    </div>
+  </section>
+
+  <!-- TRINN 2: AVVIK / ANBEFALING (knyttes til objekt) -->
+  <section class="card" id="stepFindings" style="display:none;">
+    <h2>Avvik / anbefaling</h2>
+    <p class="muted">Legg inn avvik/anbefaling og koble til riktig objekt dersom det finnes flere lokasjoner.</p>
+
+    <div class="row">
+      <div>
+        <label>Gjelder objekt</label>
+        <select id="findingLocation"></select>
+      </div>
+      <div>
         <label>Type</label>
-        <select id="itemType">
+        <select id="findingType">
           <option value="AVVIK" selected>Avvik</option>
           <option value="ANBEFALING">Anbefaling</option>
         </select>
-      </div>
-      <div>
-        <label>Ref.nr (auto)</label>
-        <input id="itemRef" disabled />
       </div>
     </div>
 
     <div class="row">
       <div>
         <label>Alvorlighet (kun avvik)</label>
-        <select id="itemSeverity">
+        <select id="findingSeverity">
           <option value="Høy">Høy</option>
           <option value="Middels" selected>Middels</option>
           <option value="Lav">Lav</option>
         </select>
       </div>
       <div>
-        <label>Frist for tilbakemelding (kun avvik)</label>
-        <input id="itemDue" type="date" />
+        <label>Frist (kun avvik)</label>
+        <input id="findingDue" type="date" />
       </div>
     </div>
 
     <label>Tittel</label>
-    <input id="itemTitle" placeholder="Kort beskrivelse" />
+    <input id="findingTitle" placeholder="Kort beskrivelse" />
 
     <label>Beskrivelse</label>
-    <textarea id="itemDesc" placeholder="Hva er observert? Hva anbefales?"></textarea>
+    <textarea id="findingDesc" placeholder="Hva er observert? Hva anbefales?"></textarea>
 
-    <label>Bilder (flere)</label>
-    <input id="itemPhotos" type="file" accept="image/*" capture="environment" multiple>
+    <label>Bilder</label>
+    <input id="findingPhotos" type="file" accept="image/*" capture="environment" multiple>
 
     <div class="inline">
-      <button class="btn primary" id="btnAddItem">Legg til</button>
-      <span class="muted">Du kan legge til flere bilder og kommentere per bilde etterpå.</span>
+      <button class="btn primary" id="btnAddFinding">Legg til</button>
     </div>
 
-    <div id="itemList"></div>
+    <div id="findingList"></div>
+
+    <div class="footerActions">
+      <button class="btn" id="btnBackToLocations">Tilbake: Lokasjoner</button>
+    </div>
   </section>
+
 </main>
 
 <script>

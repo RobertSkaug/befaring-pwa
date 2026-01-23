@@ -160,3 +160,41 @@ textarea{min-height: 90px;}
 .photoRow textarea{
   min-height:92px;
 }
+
+.split{
+  display:grid;
+  grid-template-columns: 1fr;
+  gap:12px;
+}
+@media (min-width: 900px){
+  .split{ grid-template-columns: 1fr 1fr; }
+}
+.subcard{
+  border:1px solid var(--b);
+  border-radius:16px;
+  padding:12px;
+  background:#fff;
+}
+.subhead{
+  display:flex;
+  justify-content:space-between;
+  align-items:center;
+  gap:10px;
+}
+.footerActions{
+  margin-top:16px;
+  display:flex;
+  justify-content:flex-end;
+}
+.personRow{
+  display:grid;
+  grid-template-columns: 1fr 1fr auto;
+  gap:10px;
+  align-items:end;
+  margin-top:10px;
+}
+.personRow input{ width:100%; }
+
+.chips{ display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 12px; }
+.chip{ border:1px solid var(--b); border-radius:999px; padding:8px 10px; font-weight:800; font-size:12px; background:#fff; }
+.chip.on{ background: rgba(61,61,61,.08); }

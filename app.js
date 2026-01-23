@@ -1,166 +1,448 @@
-const STORAGE_KEY = "befaring_state_v5";
-const BRREG_URL = "https://data.brreg.no/enhetsregisteret/api/enheter";
+const BRREG_BASE = "https://data.brreg.no/enhetsregisteret/api/enheter";
 
-// For raskere adresseforslag (cache + parallell)
+// Adresseforslag (Nominatim) cache + parallell
 const addrCache = new Map();
 const ADDR_CACHE_TTL_MS = 2 * 60 * 1000;
+
+// Offentlig virksomhet-forslag (Overpass)
+const OVERPASS_URL = "https://overpass-api.de/api/interpreter";
 
 let state = {
   inspectionDate: new Date().toISOString().slice(0,10),
   customer: { orgnr:"", name:"", orgForm:"", industry:"" },
+  attendees: {
+    klp: [ { name:"", title:"" } ],
+    customer: [ { name:"", title:"" } ]
+  },
+
   locations: [ newLocation("LOC-1") ],
   activeLocationId: "LOC-1",
 
-  // Items: avvik/anbefalinger, bundet til locationId
-  items: [] // {id, locationId, refNo, type, severity, dueDate, title, desc, photos:[{dataUrl, reportDataUrl, comment}], createdAt}
+  findings: [] // {id, locationId, refNo, type, severity, dueDate, title, desc, photos:[{dataUrl, reportDataUrl, comment:""}]}
 };
-
-let lastAddrSuggestions = [];
 
 const $ = (id) => document.getElementById(id);
 const digits = (s) => (s||"").replace(/\D+/g,"");
 const esc = (s) => String(s??"").replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+const MATERIALS = [
+  { code:"B", label:"B – Betong" },
+  { code:"S", label:"S – Stål" },
+  { code:"T", label:"T – Tre" },
+  { code:"M", label:"M – Mur" },
+  { code:"U", label:"U – Ubrennbar isolasjon" },
+  { code:"C", label:"C – Brennbar isolasjon" }
+];
+const PROTECTION = [
+  { code:"S", label:"S – Sprinkleranlegg" },
+  { code:"A", label:"A – Brannalarmanlegg" },
+  { code:"I", label:"I – Innbruddsalarmanlegg" },
+  { code:"G", label:"G – Gasslokkeanlegg" },
+  { code:"R", label:"R – Røykventilasjon" },
+  { code:"D", label:"D – Delvis beskyttelse" }
+];
+
+function newBuilding(id){
+  return {
+    id,
+    label: "",        // Byggbeskrivelse (blir heading)
+    buildingNo: "",   // Bygningsnummer
+    businessInBuilding: "",
+
+    buildYear:"",
+    areaM2:"",
+    floors:"",
+    columns:"",
+    beams:"",
+    deck:"",
+    roof:"",
+    outerWall:"",
+    materials:[],
+    protection:[],
+    description:"",
+    safety:"",
+    risk:""
+  };
+}
+
 function newLocation(id){
-  return { id, address:"", geo:{ lat:null, lng:null, accuracy:null, ts:null } };
-}
-function getActiveLocation(){
-  return state.locations.find(l => l.id === state.activeLocationId) || state.locations[0];
-}
-function locationIndexById(id){
-  return Math.max(0, state.locations.findIndex(l => l.id === id));
-}
-function shortAddress(addr, fallback){
-  const s = (addr||"").trim();
-  if(!s) return fallback;
-  return s.length > 50 ? s.slice(0,47)+"…" : s;
-}
-function normalizeState(){
-  if(!state.locations || !Array.isArray(state.locations) || !state.locations.length){
-    state.locations = [ newLocation("LOC-1") ];
-  }
-  if(!state.activeLocationId) state.activeLocationId = state.locations[0].id;
+  return {
+    id,
+    address:"",
+    objectName:"",
+    geo:{ lat:null, lng:null, accuracy:null, ts:null },
 
-  if(!state.items || !Array.isArray(state.items)) state.items = [];
-
-  // remove items with missing location
-  const locIds = new Set(state.locations.map(l=>l.id));
-  state.items = state.items.filter(it => locIds.has(it.locationId));
-}
-function getItemsForLocation(locationId){
-  return (state.items||[]).filter(it => it.locationId === locationId);
-}
-function nextItemIdForLocation(locationId){
-  const count = getItemsForLocation(locationId).length;
-  return `IT-${String(count+1).padStart(4,"0")}`;
-}
-function buildRefNo(locationId){
-  const locIdx = locationIndexById(locationId) + 1;
-  const seq = nextItemIdForLocation(locationId).split("-")[1];
-  const d = new Date();
-  const mm = String(d.getMonth()+1).padStart(2,"0");
-  const yy = String(d.getFullYear()).slice(-2);
-  return `L${locIdx}-${seq}-${mm}${yy}`; // eksempel: L2-0003-0126
-}
-
-function setItemFormDefaults(){
-  const loc = getActiveLocation();
-  $("itemType").value = "AVVIK";
-  $("itemSeverity").value = "Middels";
-  $("itemDue").value = "";
-  $("itemTitle").value = "";
-  $("itemDesc").value = "";
-  $("itemPhotos").value = "";
-  $("itemRef").value = buildRefNo(loc.id);
-  updateItemFormVisibility();
-}
-function updateItemFormVisibility(){
-  const isAvvik = $("itemType").value === "AVVIK";
-  $("itemSeverity").disabled = !isAvvik;
-  $("itemDue").disabled = !isAvvik;
+    buildings: [ newBuilding(`B-${id}-1`) ],
+    activeBuildingId: `B-${id}-1`
+  };
 }
 
 function init(){
-  normalizeState();
-
+  // Header labels
   $("inspectionDate").value = state.inspectionDate;
+  $("landingDate").textContent = `Dato: ${formatDateNo(state.inspectionDate)}`;
+  $("todayLabel").textContent = `Risikogjennomgang • ${formatDateNo(state.inspectionDate)}`;
 
-  $("orgnr").addEventListener("input", onOrgnr);
+  $("inspectionDate").addEventListener("input", e => {
+    state.inspectionDate = e.target.value;
+    $("landingDate").textContent = `Dato: ${formatDateNo(state.inspectionDate)}`;
+    $("todayLabel").textContent = `Risikogjennomgang • ${formatDateNo(state.inspectionDate)}`;
+  });
+
+  // Navigation buttons
+  $("btnBackToLanding").addEventListener("click", () => showStep("landing"));
+  $("btnGoLocations").addEventListener("click", () => showStep("locations"));
+  $("btnGoFindings").addEventListener("click", () => showStep("findings"));
+
+  $("btnStartInspection").addEventListener("click", () => {
+    showStep("locations");
+  });
+
+  $("btnToFindings").addEventListener("click", () => showStep("findings"));
+  $("btnBackToLocations").addEventListener("click", () => showStep("locations"));
+
+  // BRREG: orgnr input auto fetch
+  $("orgnr").addEventListener("input", async (e) => {
+    const v = digits(e.target.value);
+    e.target.value = v;
+    state.customer.orgnr = v;
+    if(v.length === 9) await fetchBrregByOrgnr(v);
+  });
+
+  $("btnSearchBrreg").addEventListener("click", async () => {
+    const q = ($("companySearch").value || "").trim();
+    const org = digits($("orgnr").value);
+    if(org.length === 9){ await fetchBrregByOrgnr(org); return; }
+    if(!q){ alert("Skriv org.nr (9 siffer) eller et navn å søke på."); return; }
+    await searchBrregByName(q);
+  });
+
+  // Manual override
   $("customerName").addEventListener("input", e => state.customer.name = e.target.value);
   $("orgForm").addEventListener("input", e => state.customer.orgForm = e.target.value);
   $("industry").addEventListener("input", e => state.customer.industry = e.target.value);
 
-  $("inspectionDate").addEventListener("input", e => state.inspectionDate = e.target.value);
+  // Attendees
+  $("btnAddKlp").addEventListener("click", () => { state.attendees.klp.push({name:"", title:""}); renderAttendees(); });
+  $("btnAddCustomerAtt").addEventListener("click", () => { state.attendees.customer.push({name:"", title:""}); renderAttendees(); });
 
-  $("address").addEventListener("input", e => {
-    const loc = getActiveLocation();
-    loc.address = e.target.value;
-    renderLocationTabs();
-    renderItemHeader();
-  });
+  // Locations
+  $("btnAddLocation").addEventListener("click", addLocation);
+  $("objectName").addEventListener("input", e => { getActiveLocation().objectName = e.target.value; renderLocationTabs(); });
+  $("address").addEventListener("input", e => { getActiveLocation().address = e.target.value; renderLocationTabs(); });
 
   $("btnGPS").addEventListener("click", getGPS);
-  $("btnAddLocation").addEventListener("click", addLocation);
 
-  $("btnSave").addEventListener("click", save);
-  $("btnLoad").addEventListener("click", load);
-  $("btnReset").addEventListener("click", resetAll);
+  // Buildings
+  $("btnAddBuilding").addEventListener("click", addBuilding);
 
-  $("btnExport").addEventListener("click", exportWord);
-  $("btnExportPdf").addEventListener("click", exportPdf);
-  $("btnShare").addEventListener("click", shareReport);
+  $("buildingLabel").addEventListener("input", e => {
+    const b = getActiveBuilding();
+    b.label = e.target.value;
+    renderBuildingTabs();
+    renderFindingLocationSelect();
+  });
 
-  $("itemType").addEventListener("change", () => updateItemFormVisibility());
-  $("btnAddItem").addEventListener("click", addItem);
+  $("buildingNo").addEventListener("input", e => {
+    const b = getActiveBuilding();
+    b.buildingNo = e.target.value;
+  });
 
-  renderAll();
+  $("businessInBuilding").addEventListener("input", e => {
+    const b = getActiveBuilding();
+    b.businessInBuilding = e.target.value;
+  });
+
+  // Business suggestions
+  $("btnSuggestBusiness").addEventListener("click", suggestBusinessFromPublicSources);
+
+  // Building fields
+  ["buildingNo","buildYear","areaM2","floors","columns","beams","deck","roof","outerWall","bDesc","bSafety","bRisk"]
+    .forEach(id => $(id).addEventListener("input", onBuildingFieldChange));
+
+  // Findings
+  $("findingType").addEventListener("change", updateFindingFormVisibility);
+  $("btnAddFinding").addEventListener("click", addFinding);
+
+  renderAttendees();
+  renderLocationTabs();
+  renderActiveLocationFields();
+  renderFindingLocationSelect();
+
+  showStep("landing");
 }
 
+function showStep(step){
+  $("stepLanding").style.display = (step==="landing") ? "block" : "none";
+  $("stepLocations").style.display = (step==="locations") ? "block" : "none";
+  $("stepFindings").style.display = (step==="findings") ? "block" : "none";
+
+  const inFlow = (step !== "landing");
+  $("btnBackToLanding").style.display = inFlow ? "inline-block" : "none";
+  $("btnGoLocations").style.display = inFlow ? "inline-block" : "none";
+  $("btnGoFindings").style.display = inFlow ? "inline-block" : "none";
+
+  if(step === "locations"){
+    renderActiveLocationFields();
+    renderFindingLocationSelect(); // keep in sync
+  }
+  if(step === "findings"){
+    renderFindingLocationSelect();
+    updateFindingFormVisibility();
+    renderFindingsList();
+  }
+}
+
+function formatDateNo(iso){
+  if(!iso) return "";
+  const [y,m,d] = iso.split("-");
+  return `${d}.${m}.${y}`;
+}
+
+/* =========================
+   BRREG
+========================= */
+async function fetchBrregByOrgnr(orgnr){
+  setBrregStatus("BRREG: henter…");
+  hideBrregResults();
+
+  try{
+    const res = await fetch(`${BRREG_BASE}/${encodeURIComponent(orgnr)}`, { headers: { "Accept":"application/json" }});
+    if(!res.ok){
+      setBrregStatus(res.status === 404 ? "BRREG: ikke funnet" : `BRREG: feil (${res.status})`);
+      return;
+    }
+    const e = await res.json();
+    applyBrregEntity(e);
+    setBrregStatus("BRREG: OK");
+  } catch {
+    setBrregStatus("BRREG: feil (nett)");
+  }
+}
+
+async function searchBrregByName(q){
+  setBrregStatus("BRREG: søker…");
+  hideBrregResults();
+
+  try{
+    const url = `${BRREG_BASE}?navn=${encodeURIComponent(q)}&size=10`;
+    const res = await fetch(url, { headers: { "Accept":"application/json" }});
+    if(!res.ok){
+      setBrregStatus(`BRREG: feil (${res.status})`);
+      return;
+    }
+    const data = await res.json();
+    const hits = data?._embedded?.enheter || [];
+    if(!hits.length){
+      setBrregStatus("BRREG: ingen treff");
+      return;
+    }
+    setBrregStatus(`BRREG: ${hits.length} treff`);
+    showBrregResults(hits);
+  } catch {
+    setBrregStatus("BRREG: feil (nett)");
+  }
+}
+
+function applyBrregEntity(e){
+  state.customer.orgnr = e.organisasjonsnummer ? String(e.organisasjonsnummer) : (state.customer.orgnr || "");
+  state.customer.name = e.navn || "";
+  state.customer.orgForm = e.organisasjonsform?.kode ? `${e.organisasjonsform.kode} – ${e.organisasjonsform.beskrivelse||""}` : "";
+  state.customer.industry = e.naeringskode1?.kode ? `${e.naeringskode1.kode} – ${e.naeringskode1.beskrivelse||""}` : "";
+
+  $("orgnr").value = state.customer.orgnr;
+  $("customerName").value = state.customer.name;
+  $("orgForm").value = state.customer.orgForm;
+  $("industry").value = state.customer.industry;
+}
+
+function showBrregResults(hits){
+  const box = $("brregResults");
+  const list = $("brregList");
+  box.style.display = "block";
+
+  list.innerHTML = hits.map((h, idx) => {
+    const org = h.organisasjonsnummer || "";
+    const name = h.navn || "";
+    const form = h.organisasjonsform?.kode || "";
+    return `
+      <div class="addrItem" data-hit="${idx}">
+        <div class="addrItem__main">${esc(name)}</div>
+        <div class="addrItem__sub">Org.nr: ${esc(org)} ${form ? `• ${esc(form)}` : ""}</div>
+      </div>
+    `;
+  }).join("");
+
+  list.querySelectorAll("[data-hit]").forEach(el => {
+    el.addEventListener("click", () => {
+      const idx = Number(el.getAttribute("data-hit"));
+      const picked = hits[idx];
+      if(!picked) return;
+      applyBrregEntity(picked);
+      hideBrregResults();
+      setBrregStatus("BRREG: OK");
+    });
+  });
+}
+
+function hideBrregResults(){
+  $("brregResults").style.display = "none";
+  $("brregList").innerHTML = "";
+}
+function setBrregStatus(t){ $("brregStatus").textContent = t; }
+
+/* =========================
+   Attendees
+========================= */
+function renderAttendees(){
+  renderAttList("klpAttendees", state.attendees.klp, "klp");
+  renderAttList("customerAttendees", state.attendees.customer, "customer");
+}
+
+function renderAttList(containerId, arr, group){
+  const root = $(containerId);
+  root.innerHTML = arr.map((p, idx) => `
+    <div class="personRow">
+      <div>
+        <label>Navn</label>
+        <input data-att-group="${group}" data-att-idx="${idx}" data-att-key="name" value="${esc(p.name)}" placeholder="Navn" />
+      </div>
+      <div>
+        <label>Tittel</label>
+        <input data-att-group="${group}" data-att-idx="${idx}" data-att-key="title" value="${esc(p.title)}" placeholder="Tittel" />
+      </div>
+      <div>
+        <button class="btn danger" data-att-del="${group}|${idx}">Slett</button>
+      </div>
+    </div>
+  `).join("");
+
+  root.querySelectorAll("input[data-att-key]").forEach(inp => {
+    inp.addEventListener("input", () => {
+      const g = inp.getAttribute("data-att-group");
+      const i = Number(inp.getAttribute("data-att-idx"));
+      const k = inp.getAttribute("data-att-key");
+      state.attendees[g][i][k] = inp.value;
+    });
+  });
+
+  root.querySelectorAll("[data-att-del]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const [g, iStr] = btn.getAttribute("data-att-del").split("|");
+      const i = Number(iStr);
+      state.attendees[g].splice(i,1);
+      if(state.attendees[g].length === 0) state.attendees[g].push({ name:"", title:"" });
+      renderAttendees();
+    });
+  });
+}
+
+/* =========================
+   Locations + Tabs
+========================= */
+function getActiveLocation(){
+  return state.locations.find(l => l.id === state.activeLocationId) || state.locations[0];
+}
+function getActiveBuilding(){
+  const loc = getActiveLocation();
+  return loc.buildings.find(b => b.id === loc.activeBuildingId) || loc.buildings[0];
+}
+function locationIndexById(id){
+  return Math.max(0, state.locations.findIndex(l => l.id === id));
+}
+function shortLabel(loc, idx){
+  const name = (loc.objectName||"").trim();
+  const addr = (loc.address||"").trim();
+  if(name) return name.length > 28 ? name.slice(0,25)+"…" : name;
+  if(addr) return addr.length > 28 ? addr.slice(0,25)+"…" : addr;
+  return `Lokasjon ${idx+1}`;
+}
 function addLocation(){
   const id = `LOC-${state.locations.length + 1}`;
   state.locations.push(newLocation(id));
   state.activeLocationId = id;
-  renderAddressSuggestions([]);
-  renderAll();
+  renderLocationTabs();
+  renderActiveLocationFields();
+  renderFindingLocationSelect();
 }
 
 function setActiveLocation(id){
   state.activeLocationId = id;
-  renderAddressSuggestions([]);
-  renderAll();
+  renderLocationTabs();
+  renderActiveLocationFields();
 }
 
-function renderAll(){
-  renderLocationTabs();
-
+function addBuilding(){
   const loc = getActiveLocation();
-  $("inspectionDate").value = state.inspectionDate || new Date().toISOString().slice(0,10);
-  $("address").value = loc.address || "";
+  const id = `B-${loc.id}-${loc.buildings.length + 1}`;
+  loc.buildings.push(newBuilding(id));
+  loc.activeBuildingId = id;
+  renderBuildingTabs();
+  renderActiveBuildingFields();
+  renderFindingLocationSelect();
+}
 
-  if(loc.geo.lat && loc.geo.lng){
-    $("gpsStatus").textContent =
-      `GPS: ${loc.geo.lat.toFixed(5)}, ${loc.geo.lng.toFixed(5)} (±${Math.round(loc.geo.accuracy||0)}m)`;
-  } else {
-    $("gpsStatus").textContent = "GPS: ikke hentet";
-  }
+function setActiveBuilding(id){
+  const loc = getActiveLocation();
+  loc.activeBuildingId = id;
+  renderBuildingTabs();
+  renderActiveBuildingFields();
+}
 
-  renderItemHeader();
-  setItemFormDefaults();
-  renderItems();
+function buildingShortLabel(b, idx){
+  const t = (b.label||"").trim();
+  if(t) return t.length > 28 ? t.slice(0,25)+"…" : t;
+  const n = (b.buildingNo||"").trim();
+  if(n) return `Bygg ${idx+1} • ${n}`;
+  return `Bygg ${idx+1}`;
+}
+
+function renderBuildingTabs(){
+  const loc = getActiveLocation();
+  const root = $("buildingTabs");
+  root.innerHTML = (loc.buildings || []).map((b, idx) => {
+    const active = (b.id === loc.activeBuildingId) ? "active" : "";
+    return `<button class="locTab ${active}" data-bid="${esc(b.id)}">
+      <span class="locTab__label">${esc(buildingShortLabel(b, idx))}</span>
+    </button>`;
+  }).join("");
+
+  root.querySelectorAll("[data-bid]").forEach(btn => {
+    btn.addEventListener("click", () => setActiveBuilding(btn.getAttribute("data-bid")));
+  });
+}
+
+function renderActiveBuildingFields(){
+  const b = getActiveBuilding();
+
+  $("buildingLabel").value = b.label || "";
+  $("buildingNo").value = b.buildingNo || "";
+  $("businessInBuilding").value = b.businessInBuilding || "";
+
+  $("buildYear").value = b.buildYear || "";
+  $("areaM2").value = b.areaM2 || "";
+  $("floors").value = b.floors || "";
+
+  $("columns").value = b.columns || "";
+  $("beams").value = b.beams || "";
+  $("deck").value = b.deck || "";
+  $("roof").value = b.roof || "";
+  $("outerWall").value = b.outerWall || "";
+
+  $("bDesc").value = b.description || "";
+  $("bSafety").value = b.safety || "";
+  $("bRisk").value = b.risk || "";
+
+  renderBuildingChips();
 }
 
 function renderLocationTabs(){
   const root = $("locTabs");
   root.innerHTML = state.locations.map((l, idx) => {
     const active = (l.id === state.activeLocationId) ? "active" : "";
-    const fallback = `Lokasjon ${idx+1}`;
-    const label = shortAddress(l.address, fallback);
-    const count = getItemsForLocation(l.id).length;
-
     return `
-      <button class="locTab ${active}" data-loc="${esc(l.id)}" title="${esc(l.address || fallback)}">
-        <span class="locTab__label">${esc(label)}</span>
-        <span class="locTab__count">(${count})</span>
+      <button class="locTab ${active}" data-loc="${esc(l.id)}">
+        <span class="locTab__label">${esc(shortLabel(l, idx))}</span>
       </button>`;
   }).join("");
 
@@ -169,54 +451,71 @@ function renderLocationTabs(){
   });
 }
 
-function renderItemHeader(){
+function renderActiveLocationFields(){
   const loc = getActiveLocation();
-  const idx = locationIndexById(loc.id);
-  const locName = `Lokasjon ${idx+1}`;
-  const addr = loc.address ? loc.address : "(adresse ikke valgt)";
-  const count = getItemsForLocation(loc.id).length;
+  $("objectName").value = loc.objectName || "";
+  $("address").value = loc.address || "";
 
-  $("devHeaderTitle").textContent = `Punkt – ${locName}`;
-  $("devHeaderSub").textContent = `${addr} • ${count} punkt`;
-}
-
-async function onOrgnr(e){
-  const v = digits(e.target.value);
-  e.target.value = v;
-  state.customer.orgnr = v;
-
-  if (v.length === 9) {
-    await brregFetch(v);
+  if(loc.geo.lat && loc.geo.lng){
+    $("gpsStatus").textContent = `GPS: ${loc.geo.lat.toFixed(5)}, ${loc.geo.lng.toFixed(5)} (±${Math.round(loc.geo.accuracy||0)}m)`;
   } else {
-    $("brregStatus").textContent = "BRREG: klar";
+    $("gpsStatus").textContent = "GPS: ikke hentet";
   }
+
+  renderBuildingTabs();
+  renderActiveBuildingFields();
+
+  renderAddressSuggestions([]);
+  renderBusinessSuggestions([]);
+  $("businessStatus").textContent = "";
 }
 
-async function brregFetch(orgnr){
-  $("brregStatus").textContent = "BRREG: henter…";
-  try{
-    const res = await fetch(`${BRREG_URL}/${encodeURIComponent(orgnr)}`, { headers: { "Accept":"application/json" }});
-    if(!res.ok){
-      $("brregStatus").textContent = res.status === 404 ? "BRREG: ikke funnet" : `BRREG: feil (${res.status})`;
-      return;
-    }
-    const e = await res.json();
-    state.customer.name = e.navn || "";
-    state.customer.orgForm = e.organisasjonsform?.kode ? `${e.organisasjonsform.kode} – ${e.organisasjonsform.beskrivelse||""}` : "";
-    state.customer.industry = e.naeringskode1?.kode ? `${e.naeringskode1.kode} – ${e.naeringskode1.beskrivelse||""}` : "";
-
-    $("customerName").value = state.customer.name;
-    $("orgForm").value = state.customer.orgForm;
-    $("industry").value = state.customer.industry;
-
-    $("brregStatus").textContent = "BRREG: OK";
-  } catch {
-    $("brregStatus").textContent = "BRREG: feil (nett)";
-  }
+function onBuildingFieldChange(){
+  const b = getActiveBuilding();
+  b.buildYear = $("buildYear").value;
+  b.areaM2 = $("areaM2").value;
+  b.floors = $("floors").value;
+  b.columns = $("columns").value;
+  b.beams = $("beams").value;
+  b.deck = $("deck").value;
+  b.roof = $("roof").value;
+  b.outerWall = $("outerWall").value;
+  b.description = $("bDesc").value;
+  b.safety = $("bSafety").value;
+  b.risk = $("bRisk").value;
 }
 
+function toggleInArray(arr, val){
+  const i = arr.indexOf(val);
+  if(i >= 0) arr.splice(i,1); else arr.push(val);
+}
+
+function renderBuildingChips(){
+  const b = getActiveBuilding();
+
+  $("matChips").innerHTML = MATERIALS.map(m => {
+    const on = b.materials.includes(m.code) ? "on" : "";
+    return `<button class="chip ${on}" data-mat="${m.code}">${esc(m.label)}</button>`;
+  }).join("");
+
+  $("protChips").innerHTML = PROTECTION.map(p => {
+    const on = b.protection.includes(p.code) ? "on" : "";
+    return `<button class="chip ${on}" data-prot="${p.code}">${esc(p.label)}</button>`;
+  }).join("");
+
+  $("matChips").querySelectorAll("[data-mat]").forEach(btn => {
+    btn.addEventListener("click", () => { toggleInArray(b.materials, btn.getAttribute("data-mat")); renderBuildingChips(); });
+  });
+  $("protChips").querySelectorAll("[data-prot]").forEach(btn => {
+    btn.addEventListener("click", () => { toggleInArray(b.protection, btn.getAttribute("data-prot")); renderBuildingChips(); });
+  });
+}
+
+/* =========================
+   GPS -> Address suggestions
+========================= */
 function cacheKey(lat,lng){
-  const r = (x) => Math.round(x * 4000) / 4000; // ~0.00025
+  const r = (x) => Math.round(x * 4000) / 4000;
   return `${r(lat)},${r(lng)}`;
 }
 
@@ -297,10 +596,7 @@ async function reverseGeocodeNominatimWithTimeout(lat, lng, timeoutMs = 2000){
 
   try{
     const url = `https://nominatim.openstreetmap.org/reverse?format=jsonv2&lat=${encodeURIComponent(lat)}&lon=${encodeURIComponent(lng)}&addressdetails=1`;
-    const res = await fetch(url, {
-      headers: { "Accept":"application/json" },
-      signal: controller.signal
-    });
+    const res = await fetch(url, { headers: { "Accept":"application/json" }, signal: controller.signal });
     if(!res.ok) return null;
 
     const data = await res.json();
@@ -311,11 +607,7 @@ async function reverseGeocodeNominatimWithTimeout(lat, lng, timeoutMs = 2000){
     const city = a.city || a.town || a.village || a.municipality || "";
     const line2 = [a.postcode, city].filter(Boolean).join(" ").trim();
 
-    return {
-      display_name: data.display_name,
-      line1: line1 || data.display_name,
-      line2: line2 || ""
-    };
+    return { display_name: data.display_name, line1: line1 || data.display_name, line2: line2 || "" };
   } catch {
     return null;
   } finally {
@@ -324,18 +616,17 @@ async function reverseGeocodeNominatimWithTimeout(lat, lng, timeoutMs = 2000){
 }
 
 function renderAddressSuggestions(list){
-  lastAddrSuggestions = list || [];
   const box = $("addrBox");
   const root = $("addrSuggestions");
 
-  if (!lastAddrSuggestions.length){
+  if (!list || !list.length){
     box.style.display = "none";
     root.innerHTML = "";
     return;
   }
 
   box.style.display = "block";
-  root.innerHTML = lastAddrSuggestions.map((x, idx) => `
+  root.innerHTML = list.map((x, idx) => `
     <div class="addrItem" data-idx="${idx}">
       <div class="addrItem__main">${esc(x.line1)}</div>
       <div class="addrItem__sub">${esc(x.line2 || x.display_name)}</div>
@@ -345,7 +636,7 @@ function renderAddressSuggestions(list){
   root.querySelectorAll(".addrItem").forEach(el => {
     el.addEventListener("click", () => {
       const idx = Number(el.getAttribute("data-idx"));
-      const picked = lastAddrSuggestions[idx];
+      const picked = list[idx];
       if (!picked) return;
 
       const loc = getActiveLocation();
@@ -353,331 +644,264 @@ function renderAddressSuggestions(list){
       $("address").value = picked.display_name;
 
       $("addrBox").style.display = "none";
-
       renderLocationTabs();
-      renderItemHeader();
+      renderFindingLocationSelect();
     });
   });
 }
 
-async function addItem(){
+/* =========================
+   Business suggestions (Overpass)
+========================= */
+async function suggestBusinessFromPublicSources(){
   const loc = getActiveLocation();
-
-  const type = $("itemType").value; // AVVIK / ANBEFALING
-  const severity = $("itemSeverity").value;
-  const dueDate = $("itemDue").value;
-  const title = $("itemTitle").value.trim();
-  const desc = $("itemDesc").value.trim();
-
-  if(!title){
-    alert("Tittel mangler.");
+  if(!loc.geo.lat || !loc.geo.lng){
+    alert("Hent GPS først, så kan vi foreslå virksomhet i bygg basert på nærliggende registrerte steder.");
     return;
   }
 
-  const refNo = $("itemRef").value || buildRefNo(loc.id);
-
-  // Bilder: flere filer -> flere fotoobjekter med comment
-  const files = Array.from($("itemPhotos").files || []);
-  const photos = [];
-  for (const f of files) {
-    // app-versjon
-    const dataUrl = await readAsDataUrlConstrained(f, 1400, 1400, 0.80);
-    // rapport-versjon: hard begrenset
-    const reportDataUrl = await readAsDataUrlConstrained(f, 900, 550, 0.80);
-    photos.push({ dataUrl, reportDataUrl, comment: "" });
+  $("businessStatus").textContent = "Henter forslag…";
+  try{
+    const list = await fetchBusinessCandidatesOverpass(loc.geo.lat, loc.geo.lng);
+    loc.businessCandidates = list;
+    renderBusinessSuggestions(list);
+    $("businessStatus").textContent = list.length ? `Fant ${list.length} forslag` : "Ingen forslag funnet";
+  } catch {
+    $("businessStatus").textContent = "Kunne ikke hente forslag";
   }
-
-  const item = {
-    id: nextItemIdForLocation(loc.id),
-    locationId: loc.id,
-    refNo,
-    type,
-    severity: (type === "AVVIK") ? severity : "",
-    dueDate: (type === "AVVIK") ? dueDate : "",
-    title,
-    desc,
-    photos,
-    createdAt: new Date().toISOString()
-  };
-
-  state.items.push(item);
-
-  renderLocationTabs();
-  renderItemHeader();
-  setItemFormDefaults();
-  renderItems();
 }
 
-function renderItems(){
-  const loc = getActiveLocation();
-  const list = getItemsForLocation(loc.id);
-  const root = $("itemList");
+async function fetchBusinessCandidatesOverpass(lat, lng){
+  const r = 80;
+  const query = `
+    [out:json][timeout:15];
+    (
+      node(around:${r},${lat},${lng})["name"];
+      way(around:${r},${lat},${lng})["name"];
+      relation(around:${r},${lat},${lng})["name"];
+    );
+    out center tags;
+  `;
+  const res = await fetch(OVERPASS_URL, {
+    method:"POST",
+    headers: { "Content-Type":"text/plain" },
+    body: query
+  });
+  if(!res.ok) return [];
+  const data = await res.json();
 
-  if(!list.length){
-    root.innerHTML = `<p class="muted">Ingen avvik/anbefalinger registrert for denne lokasjonen.</p>`;
+  const mapped = (data.elements || [])
+    .map(e => {
+      const tags = e.tags || {};
+      const name = tags.name;
+      if(!name) return null;
+      const kind = tags.amenity || tags.shop || tags.office || tags.tourism || tags.leisure || tags.man_made || tags.building || "Ukjent";
+      return { name, kind: `Type: ${kind}` };
+    })
+    .filter(Boolean);
+
+  const seen = new Set();
+  const unique = [];
+  for(const x of mapped){
+    const k = x.name.trim().toLowerCase();
+    if(seen.has(k)) continue;
+    seen.add(k);
+    unique.push(x);
+  }
+  return unique.slice(0,8);
+}
+
+function renderBusinessSuggestions(list){
+  const box = $("businessSuggestions");
+  const root = $("businessList");
+
+  if(!list || !list.length){
+    box.style.display = "none";
+    root.innerHTML = "";
     return;
   }
 
-  root.innerHTML = list.map(it => {
-    const badgeClass = it.type === "AVVIK" ? "avvik" : "anb";
-    const badgeText = it.type === "AVVIK" ? "AVVIK" : "ANBEFALING";
+  box.style.display = "block";
+  root.innerHTML = list.map((x, idx) => `
+    <div class="addrItem" data-biz="${idx}">
+      <div class="addrItem__main">${esc(x.name)}</div>
+      <div class="addrItem__sub">${esc(x.kind)}</div>
+    </div>
+  `).join("");
 
-    const meta = [
-      `Ref.nr: ${esc(it.refNo)}`,
-      it.type === "AVVIK" && it.severity ? `Alvorlighet: ${esc(it.severity)}` : "",
-      it.type === "AVVIK" && it.dueDate ? `Frist: ${esc(it.dueDate)}` : ""
-    ].filter(Boolean).join(" • ");
+  root.querySelectorAll("[data-biz]").forEach(el => {
+    el.addEventListener("click", () => {
+      const idx = Number(el.getAttribute("data-biz"));
+      const picked = list[idx];
+      if(!picked) return;
+      const building = getActiveBuilding();
+      building.businessInBuilding = picked.name;
+      $("businessInBuilding").value = picked.name;
+      $("businessSuggestions").style.display = "none";
+      renderFindingLocationSelect();
+    });
+  });
+}
 
-    const photosHtml = (it.photos||[]).map((p, idx) => `
-      <div class="photoRow">
-        <img src="${p.dataUrl}" alt="Bilde">
-        <div>
-          <label>Kommentar til bilde</label>
-          <textarea data-photo-comment="${esc(it.id)}|${idx}" placeholder="Kommentar / hva viser bildet?">${esc(p.comment||"")}</textarea>
+/* =========================
+   Findings (Avvik/Anbefaling)
+========================= */
+function renderFindingLocationSelect(){
+  const sel = $("findingLocation");
+
+  // Byggliste: "LOCID|BUILDID"
+  const options = [];
+  for(const loc of state.locations){
+    for(const b of (loc.buildings || [])){
+      const locName = (loc.address||"").trim() || loc.id;
+      const bName = (b.label||"").trim() || (b.buildingNo ? `Bygnr ${b.buildingNo}` : b.id);
+      options.push({
+        value: `${loc.id}|${b.id}`,
+        text: `${bName} — ${locName}`
+      });
+    }
+  }
+
+  sel.innerHTML = options.map(o => `<option value="${esc(o.value)}">${esc(o.text)}</option>`).join("");
+
+  // Default: aktiv lokasjon + aktivt bygg
+  const active = `${state.activeLocationId}|${getActiveLocation().activeBuildingId}`;
+  sel.value = options.some(o => o.value === active) ? active : (options[0]?.value || "");
+}
+
+function updateFindingFormVisibility(){
+  const isAvvik = $("findingType").value === "AVVIK";
+  $("findingSeverity").disabled = !isAvvik;
+  $("findingDue").disabled = !isAvvik;
+}
+
+function nextFindingSeqForLocation(locationId){
+  const count = state.findings.filter(f => f.locationId === locationId).length;
+  return count + 1;
+}
+function buildRefNo(locationId){
+  const locIdx = locationIndexById(locationId) + 1;
+  const seq = String(nextFindingSeqForLocation(locationId)).padStart(4,"0");
+  const d = new Date();
+  const mm = String(d.getMonth()+1).padStart(2,"0");
+  const yy = String(d.getFullYear()).slice(-2);
+  return `L${locIdx}-${seq}-${mm}${yy}`;
+}
+
+async function addFinding(){
+  const locs = state.locations || [];
+  if(!locs.length){ alert("Legg til minst én lokasjon først."); return; }
+
+  let composite = $("findingLocation").value;
+  if(state.locations.length > 1 && !composite){
+    alert("Velg hvilket bygg dette gjelder.");
+    return;
+  }
+  if(!composite){
+    composite = `${state.activeLocationId}|${getActiveLocation().activeBuildingId}`;
+  }
+  const [locationId, buildingId] = composite.split("|");
+
+  const loc = state.locations.find(l => l.id === locationId);
+  const b = (loc?.buildings || []).find(x => x.id === buildingId);
+
+  const buildingHeading = (b?.label || "").trim()
+    || (b?.buildingNo ? `Bygningsnr ${b.buildingNo}` : "Bygg");
+
+  const type = $("findingType").value;
+  const severity = $("findingSeverity").value;
+  const dueDate = $("findingDue").value;
+  const title = ($("findingTitle").value || "").trim();
+  const desc = ($("findingDesc").value || "").trim();
+
+  if(!title){ alert("Tittel mangler."); return; }
+
+  const files = Array.from($("findingPhotos").files || []);
+  const photos = [];
+  for(const f of files){
+    const dataUrl = await readAsDataUrlConstrained(f, 1400, 1400, 0.80);
+    const reportDataUrl = await readAsDataUrlConstrained(f, 900, 550, 0.80);
+    photos.push({ dataUrl, reportDataUrl, comment:"" });
+  }
+
+  const finding = {
+    id: `F-${Date.now()}`,
+    locationId,
+    buildingId,
+    buildingHeading,
+    refNo: buildRefNo(locationId),
+    type,
+    severity: type==="AVVIK" ? severity : "",
+    dueDate: type==="AVVIK" ? dueDate : "",
+    title,
+    desc,
+    photos
+  };
+
+  state.findings.push(finding);
+
+  // Reset form
+  $("findingTitle").value = "";
+  $("findingDesc").value = "";
+  $("findingPhotos").value = "";
+  $("findingDue").value = "";
+  $("findingType").value = "AVVIK";
+  $("findingSeverity").value = "Middels";
+  updateFindingFormVisibility();
+
+  renderFindingsList();
+}
+
+function renderFindingsList(){
+  const root = $("findingList");
+  if(!state.findings.length){
+    root.innerHTML = `<p class="muted">Ingen avvik/anbefalinger registrert.</p>`;
+    return;
+  }
+
+  // grupper per lokasjon (tydelig)
+  const byLoc = new Map();
+  for(const f of state.findings){
+    if(!byLoc.has(f.locationId)) byLoc.set(f.locationId, []);
+    byLoc.get(f.locationId).push(f);
+  }
+
+  const locName = (id) => {
+    const idx = locationIndexById(id);
+    const l = state.locations.find(x=>x.id===id);
+    return (l?.objectName||"").trim() || (l?.address||"").trim() || `Lokasjon ${idx+1}`;
+  };
+
+  root.innerHTML = Array.from(byLoc.entries()).map(([locId, arr]) => {
+    const items = arr.map(f => `
+      <div class="dev">
+        <div><strong>${esc(f.title)}</strong> <span class="muted">(${esc(f.type)})</span></div>
+        <div class="muted">Objekt: ${esc(f.buildingHeading || locName(locId))} • Ref.nr: ${esc(f.refNo)} ${f.dueDate ? `• Frist: ${esc(f.dueDate)}` : ""}</div>
+        ${f.desc ? `<div class="muted" style="margin-top:6px;">${esc(f.desc).replaceAll("\n","<br>")}</div>` : ""}
+        <div class="inline" style="margin-top:10px;">
+          <button class="btn danger" data-del-f="${esc(f.id)}">Slett</button>
         </div>
       </div>
     `).join("");
 
     return `
-      <div class="dev">
-        <div>
-          <span class="badge ${badgeClass}">${badgeText}</span>
-          <strong style="margin-left:8px;">${esc(it.title)}</strong>
-        </div>
-
-        <div class="itemMeta">${meta}</div>
-
-        ${it.desc ? `<div class="muted" style="margin-top:8px;">${esc(it.desc).replaceAll("\n","<br>")}</div>` : ""}
-
-        ${photosHtml ? `<div class="photoBlock"><strong>Bilder</strong>${photosHtml}</div>` : ""}
-
-        <div class="inline" style="margin-top:12px;">
-          <button class="btn" data-del-item="${esc(it.id)}">Slett</button>
-        </div>
-      </div>
+      <h3 style="margin:16px 0 8px;">${esc(locName(locId))}</h3>
+      ${items}
     `;
   }).join("");
 
-  // bind delete
-  root.querySelectorAll("[data-del-item]").forEach(btn => {
+  root.querySelectorAll("[data-del-f]").forEach(btn => {
     btn.addEventListener("click", () => {
-      const id = btn.getAttribute("data-del-item");
-      state.items = state.items.filter(x => !(x.id === id && x.locationId === loc.id));
-      renderLocationTabs();
-      renderItemHeader();
-      renderItems();
-    });
-  });
-
-  // bind photo comment updates
-  root.querySelectorAll("textarea[data-photo-comment]").forEach(t => {
-    t.addEventListener("input", () => {
-      const token = t.getAttribute("data-photo-comment");
-      const [itemId, idxStr] = token.split("|");
-      const idx = Number(idxStr);
-
-      const item = state.items.find(x => x.id === itemId && x.locationId === loc.id);
-      if(!item || !item.photos || !item.photos[idx]) return;
-
-      item.photos[idx].comment = t.value;
+      const id = btn.getAttribute("data-del-f");
+      state.findings = state.findings.filter(x => x.id !== id);
+      renderFindingsList();
     });
   });
 }
 
-function save(){
-  try{
-    localStorage.setItem(STORAGE_KEY, JSON.stringify(state));
-    alert("Lagret.");
-  } catch {
-    alert("Kunne ikke lagre (kan skyldes store bilder).");
-  }
-}
-
-function load(){
-  const raw = localStorage.getItem(STORAGE_KEY);
-  if(!raw){ alert("Ingen lagring funnet."); return; }
-
-  state = JSON.parse(raw);
-  normalizeState();
-
-  $("orgnr").value = state.customer?.orgnr || "";
-  $("customerName").value = state.customer?.name || "";
-  $("orgForm").value = state.customer?.orgForm || "";
-  $("industry").value = state.customer?.industry || "";
-  $("inspectionDate").value = state.inspectionDate || new Date().toISOString().slice(0,10);
-
-  renderAddressSuggestions([]);
-  renderAll();
-  alert("Lastet.");
-}
-
-function resetAll(){
-  if(!confirm("Nullstille alt?")) return;
-
-  state = {
-    inspectionDate: new Date().toISOString().slice(0,10),
-    customer: { orgnr:"", name:"", orgForm:"", industry:"" },
-    locations: [ newLocation("LOC-1") ],
-    activeLocationId: "LOC-1",
-    items: []
-  };
-
-  $("orgnr").value = "";
-  $("customerName").value = "";
-  $("orgForm").value = "";
-  $("industry").value = "";
-  $("inspectionDate").value = state.inspectionDate;
-  $("brregStatus").textContent = "BRREG: klar";
-
-  renderAddressSuggestions([]);
-  renderAll();
-}
-
-function buildReportHtml({ forPrint }){
-  const dateStr = state.inspectionDate || new Date().toISOString().slice(0,10);
-
-  const imgStyle = "display:block; margin:10px 0; border:1px solid #ddd; border-radius:8px;";
-
-  const printCss = forPrint ? `
-    <style>
-      @page { size: A4; margin: 16mm; }
-      body { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      h1, h2, h3, h4 { page-break-after: avoid; }
-      .loc { page-break-inside: avoid; }
-      .item { page-break-inside: avoid; }
-      img { page-break-inside: avoid; }
-    </style>
-  ` : "";
-
-  const locBlocks = state.locations.map((l, idx) => {
-    const locTitle = `Lokasjon ${idx+1}`;
-    const addr = l.address || "(adresse ikke valgt)";
-    const gps = (l.geo?.lat && l.geo?.lng)
-      ? `${l.geo.lat.toFixed(5)}, ${l.geo.lng.toFixed(5)} (±${Math.round(l.geo.accuracy||0)}m)`
-      : "ikke hentet";
-
-    const items = getItemsForLocation(l.id);
-    const avvik = items.filter(x => x.type === "AVVIK");
-    const anb = items.filter(x => x.type === "ANBEFALING");
-
-    const renderItem = (it) => {
-      const photos = (it.photos||[]).map(p => {
-        const src = p.reportDataUrl || p.dataUrl;
-        return `
-          <div>
-            <img src="${src}" style="${imgStyle}">
-            ${p.comment ? `<div style="color:#666; font-size:10pt; margin:0 0 8px;"><strong>Kommentar:</strong> ${esc(p.comment)}</div>` : ""}
-          </div>
-        `;
-      }).join("");
-
-      const avvikMeta = it.type === "AVVIK"
-        ? `<div><strong>Alvorlighet:</strong> ${esc(it.severity||"")} &nbsp; <strong>Frist:</strong> ${esc(it.dueDate||"")}</div>`
-        : "";
-
-      return `
-        <div class="item" style="margin:12px 0 0;">
-          <h4 style="margin:0 0 6px;">${esc(it.title)} <span style="color:#666;">(${esc(it.type)})</span></h4>
-          <div style="margin:0 0 6px;"><strong>Ref.nr:</strong> ${esc(it.refNo)}</div>
-          ${avvikMeta}
-          ${it.desc ? `<div style="margin:0 0 8px;"><strong>Beskrivelse:</strong><br>${esc(it.desc).replaceAll("\n","<br>")}</div>` : ""}
-          ${photos}
-        </div>
-        <div style="border-top:1px solid #eee; margin:12px 0;"></div>
-      `;
-    };
-
-    const avvikHtml = avvik.length ? avvik.map(renderItem).join("") : "<div>Ingen avvik.</div>";
-    const anbHtml = anb.length ? anb.map(renderItem).join("") : "<div>Ingen anbefalinger.</div>";
-
-    return `
-      <div class="loc" style="margin-top:18px;">
-        <h2 style="margin:0 0 6px;">${esc(locTitle)} – ${esc(addr)}</h2>
-        <div><strong>GPS:</strong> ${esc(gps)}</div>
-
-        <h3 style="margin:12px 0 8px;">Avvik</h3>
-        ${avvikHtml}
-
-        <h3 style="margin:12px 0 8px;">Anbefalinger</h3>
-        ${anbHtml}
-      </div>
-    `;
-  }).join("");
-
-  return `
-    <!doctype html><html><head><meta charset="utf-8">
-    ${printCss}
-    </head>
-    <body style="font-family:Arial,sans-serif;color:#333; font-size:11pt;">
-      <h1 style="margin:0 0 10px;">Befaringsrapport</h1>
-      <div><strong>Dato:</strong> ${esc(dateStr)}</div>
-      <div><strong>Kunde:</strong> ${esc(state.customer?.name || "")} &nbsp; <strong>Org.nr:</strong> ${esc(state.customer?.orgnr || "")}</div>
-      ${state.customer?.orgForm ? `<div><strong>Org.form:</strong> ${esc(state.customer.orgForm)}</div>` : ""}
-      ${state.customer?.industry ? `<div><strong>Næringskode:</strong> ${esc(state.customer.industry)}</div>` : ""}
-      ${locBlocks}
-    </body></html>
-  `;
-}
-
-function exportPdf(){
-  const html = buildReportHtml({ forPrint: true });
-  const w = window.open("", "_blank");
-  if (!w) { alert("Kunne ikke åpne nytt vindu. Sjekk popup-blokkering."); return; }
-  w.document.open();
-  w.document.write(html);
-  w.document.close();
-  w.focus();
-  setTimeout(() => w.print(), 700);
-}
-
-function exportWord(){
-  const dateStr = state.inspectionDate || new Date().toISOString().slice(0,10);
-  const fnameBase = (state.customer?.name || "Befaring")
-    .replace(/[^\w\- ]+/g,"").trim().replace(/\s+/g,"_") || "Befaring";
-  const fname = `${fnameBase}_${dateStr}.doc`;
-
-  const html = buildReportHtml({ forPrint: false });
-
-  const blob = new Blob([html], { type:"application/msword" });
-  const url = URL.createObjectURL(blob);
-  const a = document.createElement("a");
-  a.href = url;
-  a.download = fname;
-  document.body.appendChild(a);
-  a.click();
-  a.remove();
-  URL.revokeObjectURL(url);
-}
-
-async function shareReport(){
-  const dateStr = state.inspectionDate || new Date().toISOString().slice(0,10);
-  const fnameBase = (state.customer?.name || "Befaring")
-    .replace(/[^\w\- ]+/g,"").trim().replace(/\s+/g,"_") || "Befaring";
-
-  // Del Word (enklest som fil). PDF kan dere fortsatt gjøre via print->share manuelt.
-  const fname = `${fnameBase}_${dateStr}.doc`;
-  const html = buildReportHtml({ forPrint: false });
-  const blob = new Blob([html], { type: "application/msword" });
-  const file = new File([blob], fname, { type: "application/msword" });
-
-  try{
-    if (navigator.canShare && navigator.canShare({ files: [file] }) && navigator.share) {
-      await navigator.share({
-        title: "Befaringsrapport",
-        text: "Se vedlagt befaringrapport.",
-        files: [file]
-      });
-      return;
-    }
-  } catch {}
-
-  exportWord();
-  alert("Telefonen støtter ikke deling med vedlegg fra denne nettleseren. Rapporten er lastet ned – legg ved manuelt.");
-}
-
-/**
- * Leser bilde og begrenser fysisk størrelse (sikrer Word/PDF-layout).
- */
+/* =========================
+   Image helper
+========================= */
 function readAsDataUrlConstrained(file, maxW = 1200, maxH = 1200, quality = 0.8){
   return new Promise((resolve, reject) => {
     const img = new Image();
