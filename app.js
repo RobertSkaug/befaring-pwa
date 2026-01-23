@@ -42,6 +42,57 @@ const PROTECTION = [
   { code:"D", label:"D – Delvis beskyttelse" }
 ];
 
+const CONSTR_COL = [
+  { code:"BETONG", label:"Betong" },
+  { code:"STÅL", label:"Stål" },
+  { code:"TRE", label:"Tre" },
+  { code:"MUR", label:"Mur" },
+  { code:"ANNET", label:"Annet" }
+];
+const CONSTR_BEAM = [...CONSTR_COL];
+const CONSTR_DECK = [
+  { code:"BETONG", label:"Betong" },
+  { code:"TR", label:"Trebjelkelag" },
+  { code:"STÅLPL", label:"Stålplater" },
+  { code:"ANNET", label:"Annet" }
+];
+const CONSTR_ROOF = [
+  { code:"TRE", label:"Tre" },
+  { code:"STÅL", label:"Stål" },
+  { code:"BETONG", label:"Betong" },
+  { code:"PAPP", label:"Takpapp" },
+  { code:"ANNET", label:"Annet" }
+];
+const CONSTR_WALL = [
+  { code:"BETONG", label:"Betong" },
+  { code:"MUR", label:"Mur" },
+  { code:"SANDWICH", label:"Sandwich" },
+  { code:"TRE", label:"Tre" },
+  { code:"ANNET", label:"Annet" }
+];
+
+const KLP_EMPLOYEES = [
+  "Aksel Hope Jøndahl",
+  "Anders Storløkken",
+  "Ann Kristin Terese Bjørgo",
+  "Baard Isdahl",
+  "Chris Ten Hoopen",
+  "Christin Schackt Bjølverud",
+  "Gry-Merete Olaisen",
+  "Jochim Jakobsen",
+  "Jonas Pedersen",
+  "Jon Frode Skirbekk",
+  "Jørgen Synnestvedt",
+  "Lasse Andre Dahl",
+  "Linda Brodin",
+  "Odd Steinsrud",
+  "Pål Fredrik Dolven",
+  "Pål Stokkebryn",
+  "Robert Skaug",
+  "Steinar Haukeland",
+  "Thomas Nilsen"
+];
+
 function newBuilding(id){
   return {
     id,
@@ -52,11 +103,11 @@ function newBuilding(id){
     buildYear:"",
     areaM2:"",
     floors:"",
-    columns:"",
-    beams:"",
-    deck:"",
-    roof:"",
-    outerWall:"",
+    columns:[],
+    beams:[],
+    deck:[],
+    roof:[],
+    outerWall:[],
     materials:[],
     protection:[],
     description:"",
@@ -157,7 +208,7 @@ function init(){
   $("btnSuggestBusiness").addEventListener("click", suggestBusinessFromPublicSources);
 
   // Building fields
-  ["buildingNo","buildYear","areaM2","floors","columns","beams","deck","roof","outerWall","bDesc","bSafety","bRisk"]
+  ["buildYear","areaM2","floors","bDesc","bSafety","bRisk"]
     .forEach(id => $(id).addEventListener("input", onBuildingFieldChange));
 
   // Findings
@@ -191,6 +242,8 @@ function showStep(step){
     updateFindingFormVisibility();
     renderFindingsList();
   }
+
+  setTimeout(() => window.scrollTo({ top: 0, left: 0, behavior: "auto" }), 0);
 }
 
 function formatDateNo(iso){
@@ -301,11 +354,22 @@ function renderAttendees(){
 
 function renderAttList(containerId, arr, group){
   const root = $(containerId);
-  root.innerHTML = arr.map((p, idx) => `
+  
+  // For KLP: lag datalist med ansatte + tidligere brukte navn
+  let datalistHtml = "";
+  if(group === "klp"){
+    const customNames = getCustomKlpNames();
+    const allOptions = [...KLP_EMPLOYEES, ...customNames];
+    const uniqueOptions = [...new Set(allOptions)];
+    
+    datalistHtml = `<datalist id="klpNameList">${uniqueOptions.map(n => `<option value="${esc(n)}"></option>`).join("")}</datalist>`;
+  }
+  
+  root.innerHTML = datalistHtml + arr.map((p, idx) => `
     <div class="personRow">
       <div>
         <label>Navn</label>
-        <input data-att-group="${group}" data-att-idx="${idx}" data-att-key="name" value="${esc(p.name)}" placeholder="Navn" />
+        <input data-att-group="${group}" data-att-idx="${idx}" data-att-key="name" value="${esc(p.name)}" placeholder="Navn" ${group === "klp" ? 'list="klpNameList"' : ""} />
       </div>
       <div>
         <label>Tittel</label>
@@ -323,6 +387,11 @@ function renderAttList(containerId, arr, group){
       const i = Number(inp.getAttribute("data-att-idx"));
       const k = inp.getAttribute("data-att-key");
       state.attendees[g][i][k] = inp.value;
+      
+      // Lagre egendefinerte KLP-navn
+      if(g === "klp" && k === "name" && inp.value.trim()){
+        saveCustomKlpName(inp.value.trim());
+      }
     });
   });
 
@@ -335,6 +404,23 @@ function renderAttList(containerId, arr, group){
       renderAttendees();
     });
   });
+}
+
+function getCustomKlpNames(){
+  try{
+    const stored = localStorage.getItem("customKlpNames");
+    return stored ? JSON.parse(stored) : [];
+  } catch {
+    return [];
+  }
+}
+
+function saveCustomKlpName(name){
+  const names = getCustomKlpNames();
+  if(!KLP_EMPLOYEES.includes(name) && !names.includes(name)){
+    names.push(name);
+    localStorage.setItem("customKlpNames", JSON.stringify(names));
+  }
 }
 
 /* =========================
@@ -423,17 +509,12 @@ function renderActiveBuildingFields(){
   $("areaM2").value = b.areaM2 || "";
   $("floors").value = b.floors || "";
 
-  $("columns").value = b.columns || "";
-  $("beams").value = b.beams || "";
-  $("deck").value = b.deck || "";
-  $("roof").value = b.roof || "";
-  $("outerWall").value = b.outerWall || "";
-
   $("bDesc").value = b.description || "";
   $("bSafety").value = b.safety || "";
   $("bRisk").value = b.risk || "";
 
   renderBuildingChips();
+  renderConstructionChips();
 }
 
 function renderLocationTabs(){
@@ -475,11 +556,6 @@ function onBuildingFieldChange(){
   b.buildYear = $("buildYear").value;
   b.areaM2 = $("areaM2").value;
   b.floors = $("floors").value;
-  b.columns = $("columns").value;
-  b.beams = $("beams").value;
-  b.deck = $("deck").value;
-  b.roof = $("roof").value;
-  b.outerWall = $("outerWall").value;
   b.description = $("bDesc").value;
   b.safety = $("bSafety").value;
   b.risk = $("bRisk").value;
@@ -508,6 +584,29 @@ function renderBuildingChips(){
   });
   $("protChips").querySelectorAll("[data-prot]").forEach(btn => {
     btn.addEventListener("click", () => { toggleInArray(b.protection, btn.getAttribute("data-prot")); renderBuildingChips(); });
+  });
+}
+
+function renderConstructionChips(){
+  const b = getActiveBuilding();
+  renderChipGroup("colChips", CONSTR_COL, b.columns, (code) => { toggleInArray(b.columns, code); renderConstructionChips(); });
+  renderChipGroup("beamChips", CONSTR_BEAM, b.beams, (code) => { toggleInArray(b.beams, code); renderConstructionChips(); });
+  renderChipGroup("deckChips", CONSTR_DECK, b.deck, (code) => { toggleInArray(b.deck, code); renderConstructionChips(); });
+  renderChipGroup("roofChips", CONSTR_ROOF, b.roof, (code) => { toggleInArray(b.roof, code); renderConstructionChips(); });
+  renderChipGroup("wallChips", CONSTR_WALL, b.outerWall, (code) => { toggleInArray(b.outerWall, code); renderConstructionChips(); });
+}
+
+function renderChipGroup(containerId, options, selectedArr, onToggle){
+  const root = $(containerId);
+  if(!root) return;
+
+  root.innerHTML = options.map(o => {
+    const on = selectedArr.includes(o.code) ? "on" : "";
+    return `<button class="chip ${on}" data-code="${esc(o.code)}">${esc(o.label)}</button>`;
+  }).join("");
+
+  root.querySelectorAll("[data-code]").forEach(btn => {
+    btn.addEventListener("click", () => onToggle(btn.getAttribute("data-code")));
   });
 }
 
@@ -753,11 +852,15 @@ function renderFindingLocationSelect(){
   const options = [];
   for(const loc of state.locations){
     for(const b of (loc.buildings || [])){
-      const locName = (loc.address||"").trim() || loc.id;
-      const bName = (b.label||"").trim() || (b.buildingNo ? `Bygnr ${b.buildingNo}` : b.id);
+      const label = (b.label||"").trim();
+      const no = (b.buildingNo||"").trim();
+
+      let text = label || "Bygg";
+      if (no) text = label ? `${label} (${no})` : no;
+
       options.push({
         value: `${loc.id}|${b.id}`,
-        text: `${bName} — ${locName}`
+        text
       });
     }
   }
@@ -818,10 +921,20 @@ async function addFinding(){
 
   const files = Array.from($("findingPhotos").files || []);
   const photos = [];
-  for(const f of files){
-    const dataUrl = await readAsDataUrlConstrained(f, 1400, 1400, 0.80);
-    const reportDataUrl = await readAsDataUrlConstrained(f, 900, 550, 0.80);
-    photos.push({ dataUrl, reportDataUrl, comment:"" });
+
+  for (const f of files) {
+    try {
+      // Prøv "rapportvennlig" (resized JPEG)
+      const reportDataUrl = await readAsDataUrlConstrained(f, 900, 550, 0.80);
+      // Prøv "full" (større)
+      const dataUrl = await readAsDataUrlConstrained(f, 1400, 1400, 0.80);
+
+      photos.push({ dataUrl, reportDataUrl, comment: "" });
+    } catch (e) {
+      // Fallback: hvis canvas/konvertering feiler, ta rå dataURL
+      const raw = await readFileAsDataUrl(f);
+      photos.push({ dataUrl: raw, reportDataUrl: raw, comment: "" });
+    }
   }
 
   const finding = {
@@ -878,6 +991,11 @@ function renderFindingsList(){
         <div><strong>${esc(f.title)}</strong> <span class="muted">(${esc(f.type)})</span></div>
         <div class="muted">Objekt: ${esc(f.buildingHeading || locName(locId))} • Ref.nr: ${esc(f.refNo)} ${f.dueDate ? `• Frist: ${esc(f.dueDate)}` : ""}</div>
         ${f.desc ? `<div class="muted" style="margin-top:6px;">${esc(f.desc).replaceAll("\n","<br>")}</div>` : ""}
+        ${(f.photos && f.photos.length) ? `
+          <div class="thumbs">
+            ${f.photos.map(p => `<img class="thumb" src="${esc(p.reportDataUrl || p.dataUrl)}" alt="">`).join("")}
+          </div>
+        ` : `<div class="muted" style="margin-top:6px;">Ingen bilder</div>`}
         <div class="inline" style="margin-top:10px;">
           <button class="btn danger" data-del-f="${esc(f.id)}">Slett</button>
         </div>
@@ -902,6 +1020,15 @@ function renderFindingsList(){
 /* =========================
    Image helper
 ========================= */
+function readFileAsDataUrl(file){
+  return new Promise((resolve, reject) => {
+    const r = new FileReader();
+    r.onload = () => resolve(r.result);
+    r.onerror = () => reject(r.error);
+    r.readAsDataURL(file);
+  });
+}
+
 function readAsDataUrlConstrained(file, maxW = 1200, maxH = 1200, quality = 0.8){
   return new Promise((resolve, reject) => {
     const img = new Image();

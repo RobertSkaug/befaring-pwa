@@ -37,6 +37,7 @@ textarea{min-height: 90px;}
 .dev{border:1px solid var(--b); border-radius:14px; background:#fff; padding:10px 12px; margin-top:10px;}
 .thumbs{display:flex; gap:8px; flex-wrap:wrap; margin-top:10px;}
 .thumbs img{width:84px; height:84px; object-fit:cover; border-radius:12px; border:1px solid var(--b);}
+.thumb{ width:120px; height:auto; border-radius:12px; border:1px solid var(--b); }
 
 .locHeader{
   display:flex;

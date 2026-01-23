@@ -7,6 +7,10 @@
 
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#3D3D3D">
+  
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 
   <link rel="stylesheet" href="./styles.css">
 </head>
@@ -208,18 +212,21 @@
     <div class="chips" id="protChips"></div>
 
     <h4 style="margin-top:14px;">Konstruksjon</h4>
-    <div class="row">
-      <div><label>Søyler</label><input id="columns" placeholder="F.eks. Betong / Stål" /></div>
-      <div><label>Bjelker</label><input id="beams" placeholder="F.eks. Stål" /></div>
-    </div>
-    <div class="row">
-      <div><label>Dekke</label><input id="deck" placeholder="F.eks. Betong" /></div>
-      <div><label>Tak</label><input id="roof" placeholder="F.eks. Tre / Stålplater" /></div>
-    </div>
-    <div class="row">
-      <div><label>Yttervegg</label><input id="outerWall" placeholder="F.eks. Sandwich / Mur" /></div>
-      <div></div>
-    </div>
+
+    <label>Søyler</label>
+    <div class="chips" id="colChips"></div>
+
+    <label>Bjelker</label>
+    <div class="chips" id="beamChips"></div>
+
+    <label>Dekke</label>
+    <div class="chips" id="deckChips"></div>
+
+    <label>Tak</label>
+    <div class="chips" id="roofChips"></div>
+
+    <label>Yttervegg</label>
+    <div class="chips" id="wallChips"></div>
 
     <label>Bygningsbeskrivelse</label>
     <textarea id="bDesc"></textarea>
@@ -231,7 +238,7 @@
     <textarea id="bRisk"></textarea>
 
     <div class="footerActions">
-      <button class="btn" id="btnToFindings">Neste: Avvik/Anbefaling</button>
+      <button class="btn" id="btnToFindings">Registrer avvik/anbefaling</button>
     </div>
   </section>
 
@@ -291,11 +298,13 @@
 
 </main>
 
+<!--
 <script>
   if ("serviceWorker" in navigator) {
     navigator.serviceWorker.register("./sw.js").catch(()=>{});
   }
 </script>
+-->
 <script src="./app.js"></script>
 </body>
 </html>
