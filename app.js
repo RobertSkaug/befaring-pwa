@@ -165,10 +165,11 @@ function newBuilding(id){
     id,
     label: "",        // Byggbeskrivelse (blir heading)
     buildingNo: "",   // Bygningsnummer
-    businessInBuilding: "",
+    businessInBuilding: [],
 
     buildYear:"",
     areaM2:"",
+    areaBreakdown:{},
     floors:"",
     columns:[],
     beams:[],
@@ -200,15 +201,8 @@ function init(){
   setupUpdater();
 
   // Header labels
-  $("inspectionDate").value = state.inspectionDate;
   $("landingDate").textContent = `Dato: ${formatDateNo(state.inspectionDate)}`;
   $("todayLabel").textContent = `Risikogjennomgang • ${formatDateNo(state.inspectionDate)}`;
-
-  $("inspectionDate").addEventListener("input", e => {
-    state.inspectionDate = e.target.value;
-    $("landingDate").textContent = `Dato: ${formatDateNo(state.inspectionDate)}`;
-    $("todayLabel").textContent = `Risikogjennomgang • ${formatDateNo(state.inspectionDate)}`;
-  });
 
   // Navigation buttons
   $("btnBackToLanding").addEventListener("click", () => showStep("landing"));
@@ -269,13 +263,28 @@ function init(){
     b.buildingNo = e.target.value;
   });
 
-  $("businessInBuilding").addEventListener("input", e => {
+  // Business: manuell input med Enter
+  $("businessManual").addEventListener("keydown", (e) => {
+    if (e.key !== "Enter") return;
+    e.preventDefault();
+    const val = ($("businessManual").value || "").trim();
+    if(!val) return;
+
     const b = getActiveBuilding();
-    b.businessInBuilding = e.target.value;
+    if(!b.businessInBuilding.includes(val)) b.businessInBuilding.push(val);
+    $("businessManual").value = "";
+    renderBusinessSelected();
+    renderAreaBreakdown();
   });
 
   // Business suggestions
   $("btnSuggestBusiness").addEventListener("click", suggestBusinessFromPublicSources);
+
+  // Areal: trigger breakdown update
+  $("areaM2").addEventListener("input", () => {
+    onBuildingFieldChange();
+    updateAreaSumStatus();
+  });
 
   // Building fields
   ["buildYear","areaM2","floors","bDesc","bSafety","bRisk"]
@@ -573,7 +582,7 @@ function renderActiveBuildingFields(){
 
   $("buildingLabel").value = b.label || "";
   $("buildingNo").value = b.buildingNo || "";
-  $("businessInBuilding").value = b.businessInBuilding || "";
+  $("businessManual").value = "";
 
   $("buildYear").value = b.buildYear || "";
   $("areaM2").value = b.areaM2 || "";
@@ -585,6 +594,8 @@ function renderActiveBuildingFields(){
 
   renderBuildingChips();
   renderConstructionChips();
+  renderBusinessSelected();
+  renderAreaBreakdown();
 }
 
 function renderLocationTabs(){
@@ -634,6 +645,105 @@ function onBuildingFieldChange(){
 function toggleInArray(arr, val){
   const i = arr.indexOf(val);
   if(i >= 0) arr.splice(i,1); else arr.push(val);
+}
+
+function renderBusinessSelected(){
+  const b = getActiveBuilding();
+  const root = $("businessSelected");
+  const status = $("businessStatus");
+  if(!root) return;
+
+  const count = (b.businessInBuilding || []).length;
+  if(status) status.textContent = count ? `Valgt: ${count} bruksområde${count !== 1 ? 'r' : ''}` : "";
+
+  root.innerHTML = (b.businessInBuilding || []).map((x, idx) => `
+    <button class="chip on" data-del-biz="${idx}">
+      ${esc(x)} ✕
+    </button>
+  `).join("");
+
+  root.querySelectorAll("[data-del-biz]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const i = Number(btn.getAttribute("data-del-biz"));
+      b.businessInBuilding.splice(i, 1);
+      renderBusinessSelected();
+      renderAreaBreakdown();
+    });
+  });
+}
+
+function renderAreaBreakdown(){
+  const b = getActiveBuilding();
+  const root = $("areaBreakdown");
+  const status = $("areaSumStatus");
+  if(!root || !status) return;
+
+  const keys = (b.businessInBuilding || []).slice();
+  if(!keys.length){
+    root.innerHTML = `<p class="muted">Legg til virksomheter først for å fordele arealet.</p>`;
+    status.textContent = "";
+    return;
+  }
+
+  // sørg for at breakdown har nøkler
+  b.areaBreakdown = b.areaBreakdown || {};
+  for(const k of keys){
+    if(b.areaBreakdown[k] == null) b.areaBreakdown[k] = "";
+  }
+  // fjern gamle nøkler som ikke er valgt lenger
+  for(const k of Object.keys(b.areaBreakdown)){
+    if(!keys.includes(k)) delete b.areaBreakdown[k];
+  }
+
+  root.innerHTML = keys.map(k => `
+    <div class="row" style="margin-top:8px;">
+      <div style="flex:2;">
+        <label>${esc(k)}</label>
+        <input data-ab-key="${esc(k)}" inputmode="numeric" placeholder="m²" value="${esc(b.areaBreakdown[k] || "")}">
+      </div>
+      <div></div>
+    </div>
+  `).join("");
+
+  root.querySelectorAll("input[data-ab-key]").forEach(inp => {
+    inp.addEventListener("input", () => {
+      const key = inp.getAttribute("data-ab-key");
+      b.areaBreakdown[key] = inp.value;
+      updateAreaSumStatus();
+    });
+  });
+
+  updateAreaSumStatus();
+}
+
+function updateAreaSumStatus(){
+  const b = getActiveBuilding();
+  const total = Number((b.areaM2 || "").replace(",", "."));
+  const sum = Object.values(b.areaBreakdown || {}).reduce((acc, v) => {
+    const n = Number(String(v||"").replace(",", "."));
+    return acc + (isFinite(n) ? n : 0);
+  }, 0);
+
+  const status = $("areaSumStatus");
+  if(!status) return;
+
+  if(!b.areaM2){
+    status.textContent = sum ? `Sum fordelt areal: ${sum} m²` : "";
+    return;
+  }
+  
+  const diff = Math.abs(total - sum);
+  let message = `Sum fordelt areal: ${sum} m² (Total: ${total} m²)`;
+  
+  if(diff > 0.1 && sum > 0){
+    if(sum > total){
+      message += ` ⚠️ Fordelt areal overstiger total med ${(sum - total).toFixed(0)} m²`;
+    } else if(sum < total){
+      message += ` ℹ️ ${(total - sum).toFixed(0)} m² gjenstår å fordele`;
+    }
+  }
+  
+  status.textContent = message;
 }
 
 function renderBuildingChips(){
@@ -903,11 +1013,17 @@ function renderBusinessSuggestions(list){
       const idx = Number(el.getAttribute("data-biz"));
       const picked = list[idx];
       if(!picked) return;
-      const building = getActiveBuilding();
-      building.businessInBuilding = picked.name;
-      $("businessInBuilding").value = picked.name;
-      $("businessSuggestions").style.display = "none";
-      renderFindingLocationSelect();
+
+      const b = getActiveBuilding();
+      const name = picked.name.trim();
+
+      // toggle multi-select
+      const i = b.businessInBuilding.indexOf(name);
+      if(i >= 0) b.businessInBuilding.splice(i,1);
+      else b.businessInBuilding.push(name);
+
+      renderBusinessSelected();
+      renderAreaBreakdown();
     });
   });
 }

@@ -82,10 +82,7 @@
         <label>Næringskode</label>
         <input id="industry" placeholder="Fylles hvis tilgjengelig" />
       </div>
-      <div>
-        <label>Befaringsdato</label>
-        <input id="inspectionDate" type="date" />
-      </div>
+      <div></div>
     </div>
 
     <hr style="margin:14px 0; border:none; border-top:1px solid #eee;">
@@ -170,11 +167,11 @@
 
     <h3>1. Beskrivelse av bygg (for valgt lokasjon)</h3>
 
-    <div class="row">
-      <div>
-        <label>Virksomhet i bygg</label>
-        <input id="businessInBuilding" placeholder="F.eks. museum, lager, kontor…" />
-      </div>
+    <div>
+      <label>Virksomhet i bygg (flere mulig)</label>
+      <input id="businessManual" placeholder="Legg til manuelt og trykk Enter…" />
+      <div class="chips" id="businessSelected"></div>
+      <div class="muted" id="businessStatus" style="margin-top:6px;"></div>
     </div>
 
     <div class="inline">
@@ -193,10 +190,16 @@
         <input id="buildYear" inputmode="numeric" placeholder="År" />
       </div>
       <div>
-        <label>Areal (m²)</label>
+        <label>Totalareal (m²)</label>
         <input id="areaM2" inputmode="numeric" placeholder="m²" />
       </div>
     </div>
+
+    <div class="muted" style="margin-top:8px;">
+      Fordel totalarealet per bruksområde (basert på valgte virksomheter).
+    </div>
+    <div id="areaBreakdown"></div>
+    <div class="muted" id="areaSumStatus"></div>
 
     <div class="row">
       <div>
