@@ -1,4 +1,4 @@
-const CACHE = "befaring-pwa-v11";
+const CACHE = "befaring-pwa-v12";
 const ASSETS = [
   "./",
   "./index.html",
@@ -23,4 +23,10 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request)));
+});
+
+self.addEventListener("message", (event) => {
+  if (event.data && event.data.type === "SKIP_WAITING") {
+    self.skipWaiting();
+  }
 });

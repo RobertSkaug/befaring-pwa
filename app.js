@@ -1,5 +1,72 @@
 const BRREG_BASE = "https://data.brreg.no/enhetsregisteret/api/enheter";
 
+// Service Worker updater
+let swReg = null;
+let hasUpdate = false;
+
+function setupUpdater(){
+  if (!("serviceWorker" in navigator)) return;
+
+  navigator.serviceWorker.register("./sw.js").then(reg => {
+    swReg = reg;
+
+    // Hvis en ny SW allerede ligger klar
+    if (reg.waiting) {
+      hasUpdate = true;
+      showUpdateButton(true);
+    }
+
+    // Når en ny SW blir funnet
+    reg.addEventListener("updatefound", () => {
+      const newWorker = reg.installing;
+      if (!newWorker) return;
+
+      newWorker.addEventListener("statechange", () => {
+        // Når installert og det finnes en eksisterende controller => oppdatering tilgjengelig
+        if (newWorker.state === "installed" && navigator.serviceWorker.controller) {
+          hasUpdate = true;
+          showUpdateButton(true);
+        }
+      });
+    });
+  }).catch(() => {
+    // silent
+  });
+
+  // Knapp: forsøk å oppdatere
+  const btn = document.getElementById("btnUpdateApp");
+  if (btn){
+    btn.addEventListener("click", async () => {
+      await forceUpdateNow();
+    });
+  }
+}
+
+function showUpdateButton(show){
+  const btn = document.getElementById("btnUpdateApp");
+  if (!btn) return;
+  btn.style.display = show ? "inline-block" : "none";
+}
+
+async function forceUpdateNow(){
+  // 1) Prøv å trigge oppdatering
+  try {
+    if (swReg) await swReg.update();
+  } catch {}
+
+  // 2) Hvis en SW venter, aktiver den
+  if (swReg && swReg.waiting){
+    try {
+      swReg.waiting.postMessage({ type: "SKIP_WAITING" });
+    } catch {}
+  }
+
+  // 3) Reload med cache-bust
+  const u = new URL(location.href);
+  u.searchParams.set("v", String(Date.now()));
+  location.replace(u.toString());
+}
+
 // Adresseforslag (Nominatim) cache + parallell
 const addrCache = new Map();
 const ADDR_CACHE_TTL_MS = 2 * 60 * 1000;
@@ -129,6 +196,9 @@ function newLocation(id){
 }
 
 function init(){
+  // Setup service worker updater
+  setupUpdater();
+
   // Header labels
   $("inspectionDate").value = state.inspectionDate;
   $("landingDate").textContent = `Dato: ${formatDateNo(state.inspectionDate)}`;

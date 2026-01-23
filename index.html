@@ -25,6 +25,7 @@
       </div>
     </div>
     <div class="actions">
+      <button class="btn" id="btnUpdateApp" style="display:none;">Oppdater app</button>
       <button class="btn" id="btnBackToLanding" style="display:none;">Til start</button>
       <button class="btn" id="btnGoLocations" style="display:none;">Lokasjoner</button>
       <button class="btn" id="btnGoFindings" style="display:none;">Avvik/Anbefaling</button>
@@ -298,11 +299,6 @@
 
 </main>
 
-<script>
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js").catch(()=>{});
-  }
-</script>
 <script src="./app.js"></script>
 </body>
 </html>
