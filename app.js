@@ -171,6 +171,37 @@ const KLP_EMPLOYEES = [
   "Thomas Nilsen"
 ];
 
+const KLP_TITLES = [
+  "Direktør",
+  "Avdelingsleder",
+  "KAM",
+  "Porteføljeansvarlig",
+  "Senior forvalter",
+  "Forvalter",
+  "Undervwriter",
+  "Skadeforebygger",
+  "Senior skadeforebygger"
+];
+
+const CUSTOMER_TITLES = [
+  "Daglig leder",
+  "Eier / Bedriftseier",
+  "Styreleder",
+  "Partner",
+  "Administrerende direktør (CEO)",
+  "Driftsleder",
+  "Eiendomssjef",
+  "Teknisk sjef",
+  "Vedlikeholdsleder",
+  "Facility Manager / Eiendomsforvalter",
+  "Produksjonssjef",
+  "Formann / Bas",
+  "Arbeidsleder",
+  "Teknisk ansvarlig",
+  "Vaktmester",
+  "Prosjektleder"
+];
+
 function newBuilding(id){
   return {
     id,
@@ -249,7 +280,10 @@ function init(){
   });
 
   // Manual override
-  $("customerName").addEventListener("input", e => state.customer.name = e.target.value);
+  $("customerName").addEventListener("input", e => {
+    state.customer.name = e.target.value;
+    updateCustomerHeading();
+  });
   $("orgForm").addEventListener("input", e => state.customer.orgForm = e.target.value);
   $("industry").addEventListener("input", e => state.customer.industry = e.target.value);
 
@@ -311,6 +345,7 @@ function init(){
   $("btnAddFinding").addEventListener("click", addFinding);
 
   renderAttendees();
+  updateCustomerHeading();
   renderLocationTabs();
   renderActiveLocationFields();
   renderFindingLocationSelect();
@@ -407,6 +442,16 @@ function applyBrregEntity(e){
   $("customerName").value = state.customer.name;
   $("orgForm").value = state.customer.orgForm;
   $("industry").value = state.customer.industry;
+  
+  updateCustomerHeading();
+}
+
+function updateCustomerHeading(){
+  const heading = $("customerHeading");
+  if(heading){
+    const name = state.customer.name && state.customer.name.trim() ? state.customer.name : "Kunde";
+    heading.textContent = name;
+  }
 }
 
 function showBrregResults(hits){
@@ -465,6 +510,9 @@ function renderAttList(containerId, arr, group){
     datalistHtml = `<datalist id="klpNameList">${uniqueOptions.map(n => `<option value="${esc(n)}"></option>`).join("")}</datalist>`;
   }
   
+  // Velg tittel-liste basert på gruppe
+  const titleList = group === "klp" ? KLP_TITLES : CUSTOMER_TITLES;
+  
   root.innerHTML = datalistHtml + arr.map((p, idx) => `
     <div class="personRow">
       <div>
@@ -473,7 +521,10 @@ function renderAttList(containerId, arr, group){
       </div>
       <div>
         <label>Tittel</label>
-        <input data-att-group="${group}" data-att-idx="${idx}" data-att-key="title" value="${esc(p.title)}" placeholder="Tittel" />
+        <select data-att-group="${group}" data-att-idx="${idx}" data-att-key="title">
+          <option value="">Velg tittel</option>
+          ${titleList.map(t => `<option value="${esc(t)}" ${p.title === t ? "selected" : ""}>${esc(t)}</option>`).join("")}
+        </select>
       </div>
       <div>
         <button class="btn danger" data-att-del="${group}|${idx}">Slett</button>
@@ -492,6 +543,15 @@ function renderAttList(containerId, arr, group){
       if(g === "klp" && k === "name" && inp.value.trim()){
         saveCustomKlpName(inp.value.trim());
       }
+    });
+  });
+
+  root.querySelectorAll("select[data-att-key]").forEach(sel => {
+    sel.addEventListener("change", () => {
+      const g = sel.getAttribute("data-att-group");
+      const i = Number(sel.getAttribute("data-att-idx"));
+      const k = sel.getAttribute("data-att-key");
+      state.attendees[g][i][k] = sel.value;
     });
   });
 
