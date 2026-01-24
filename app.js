@@ -500,24 +500,21 @@ function renderAttendees(){
 function renderAttList(containerId, arr, group){
   const root = $(containerId);
   
-  // For KLP: lag datalist med ansatte + tidligere brukte navn
-  let datalistHtml = "";
-  if(group === "klp"){
-    const customNames = getCustomKlpNames();
-    const allOptions = [...KLP_EMPLOYEES, ...customNames];
-    const uniqueOptions = [...new Set(allOptions)];
-    
-    datalistHtml = `<datalist id="klpNameList">${uniqueOptions.map(n => `<option value="${esc(n)}"></option>`).join("")}</datalist>`;
-  }
-  
-  // Velg tittel-liste basert på gruppe
+  // Velg tittel-liste og navn-liste basert på gruppe
   const titleList = group === "klp" ? KLP_TITLES : CUSTOMER_TITLES;
+  const nameList = group === "klp" ? KLP_EMPLOYEES : null;
   
-  root.innerHTML = datalistHtml + arr.map((p, idx) => `
+  root.innerHTML = arr.map((p, idx) => `
     <div class="personRow">
       <div>
         <label>Navn</label>
-        <input data-att-group="${group}" data-att-idx="${idx}" data-att-key="name" value="${esc(p.name)}" placeholder="Navn" ${group === "klp" ? 'list="klpNameList"' : ""} />
+        ${group === "klp" 
+          ? `<select data-att-group="${group}" data-att-idx="${idx}" data-att-key="name">
+              <option value="">Velg navn</option>
+              ${nameList.map(n => `<option value="${esc(n)}" ${p.name === n ? "selected" : ""}>${esc(n)}</option>`).join("")}
+            </select>`
+          : `<input data-att-group="${group}" data-att-idx="${idx}" data-att-key="name" value="${esc(p.name)}" placeholder="Navn" />`
+        }
       </div>
       <div>
         <label>Tittel</label>
@@ -532,26 +529,13 @@ function renderAttList(containerId, arr, group){
     </div>
   `).join("");
 
-  root.querySelectorAll("input[data-att-key]").forEach(inp => {
-    inp.addEventListener("input", () => {
-      const g = inp.getAttribute("data-att-group");
-      const i = Number(inp.getAttribute("data-att-idx"));
-      const k = inp.getAttribute("data-att-key");
-      state.attendees[g][i][k] = inp.value;
-      
-      // Lagre egendefinerte KLP-navn
-      if(g === "klp" && k === "name" && inp.value.trim()){
-        saveCustomKlpName(inp.value.trim());
-      }
-    });
-  });
-
-  root.querySelectorAll("select[data-att-key]").forEach(sel => {
-    sel.addEventListener("change", () => {
-      const g = sel.getAttribute("data-att-group");
-      const i = Number(sel.getAttribute("data-att-idx"));
-      const k = sel.getAttribute("data-att-key");
-      state.attendees[g][i][k] = sel.value;
+  root.querySelectorAll("input[data-att-key], select[data-att-key]").forEach(elem => {
+    const eventType = elem.tagName === "INPUT" ? "input" : "change";
+    elem.addEventListener(eventType, () => {
+      const g = elem.getAttribute("data-att-group");
+      const i = Number(elem.getAttribute("data-att-idx"));
+      const k = elem.getAttribute("data-att-key");
+      state.attendees[g][i][k] = elem.value;
     });
   });
 
@@ -564,23 +548,6 @@ function renderAttList(containerId, arr, group){
       renderAttendees();
     });
   });
-}
-
-function getCustomKlpNames(){
-  try{
-    const stored = localStorage.getItem("customKlpNames");
-    return stored ? JSON.parse(stored) : [];
-  } catch {
-    return [];
-  }
-}
-
-function saveCustomKlpName(name){
-  const names = getCustomKlpNames();
-  if(!KLP_EMPLOYEES.includes(name) && !names.includes(name)){
-    names.push(name);
-    localStorage.setItem("customKlpNames", JSON.stringify(names));
-  }
 }
 
 /* =========================

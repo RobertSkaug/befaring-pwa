@@ -20,7 +20,30 @@ main{padding: 14px 0 34px;}
 .card{background: rgba(255,255,255,.94); border:1px solid var(--b); border-radius: var(--r); box-shadow: var(--sh); padding: 14px; margin-top: 12px;}
 h2{margin:0 0 10px; font-size:16px;}
 label{display:block; margin:10px 0 6px; font-size:12px; color: var(--mut);}
-input, select, textarea{width:100%; border:1px solid var(--b); border-radius: 12px; padding: 10px 12px; font-size: 16px;}
+input, select, textarea{
+  width:100%; 
+  border:1px solid var(--b); 
+  border-radius: 12px; 
+  padding: 10px 12px; 
+  font-size: 16px;
+  background: #fff;
+  color: var(--g);
+  font-family: inherit;
+  transition: all 0.2s ease;
+}
+input:focus, select:focus, textarea:focus{
+  outline: none;
+  border-color: rgba(13,178,138,.4);
+  box-shadow: 0 0 0 3px rgba(13,178,138,.08);
+}
+select{
+  cursor: pointer;
+  appearance: none;
+  background-image: url("data:image/svg+xml,%3Csvg width='12' height='8' viewBox='0 0 12 8' fill='none' xmlns='http://www.w3.org/2000/svg'%3E%3Cpath d='M1 1.5L6 6.5L11 1.5' stroke='%233D3D3D' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'/%3E%3C/svg%3E");
+  background-repeat: no-repeat;
+  background-position: right 12px center;
+  padding-right: 36px;
+}
 textarea{min-height: 90px;}
 .row{display:grid; grid-template-columns: 1fr 1fr; gap:10px;}
 @media (max-width: 640px){ .row{grid-template-columns:1fr;} }
