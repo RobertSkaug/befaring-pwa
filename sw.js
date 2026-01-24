@@ -1,16 +1,18 @@
-const CACHE = "befaring-pwa-v12";
+const CACHE = "befaring-pwa-v22";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./app.js",
+  "./report.css",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
-  "./icons/icon-512.png"
+  "./icons/icon-512.png",
+  "./icons/KLP_logo_koksgraa.png"
 ];
 
 self.addEventListener("install", (event) => {
-  self.skipWaiting();
+  // IKKE skipWaiting her - vent på brukerens bekreftelse
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
 });
 

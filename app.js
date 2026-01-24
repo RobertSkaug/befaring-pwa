@@ -10,6 +10,11 @@ function setupUpdater(){
   navigator.serviceWorker.register("./sw.js").then(reg => {
     swReg = reg;
 
+    // Sjekk for oppdateringer hver 60. sekund
+    setInterval(() => {
+      reg.update();
+    }, 60000);
+
     // Hvis en ny SW allerede ligger klar
     if (reg.waiting) {
       hasUpdate = true;
@@ -31,6 +36,12 @@ function setupUpdater(){
     });
   }).catch(() => {
     // silent
+  });
+
+  // Lytt på controller-endringer (når ny SW aktiveres)
+  navigator.serviceWorker.addEventListener("controllerchange", () => {
+    // Reload appen når ny SW tar over
+    window.location.reload();
   });
 
   // Knapp: forsøk å oppdatere
