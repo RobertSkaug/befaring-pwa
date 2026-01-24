@@ -20,7 +20,7 @@ main{padding: 14px 0 34px;}
 .card{background: rgba(255,255,255,.94); border:1px solid var(--b); border-radius: var(--r); box-shadow: var(--sh); padding: 14px; margin-top: 12px;}
 h2{margin:0 0 10px; font-size:16px;}
 label{display:block; margin:10px 0 6px; font-size:12px; color: var(--mut);}
-input, select, textarea{width:100%; border:1px solid var(--b); border-radius: 12px; padding: 10px 12px; font-size: 15px;}
+input, select, textarea{width:100%; border:1px solid var(--b); border-radius: 12px; padding: 10px 12px; font-size: 16px;}
 textarea{min-height: 90px;}
 .row{display:grid; grid-template-columns: 1fr 1fr; gap:10px;}
 @media (max-width: 640px){ .row{grid-template-columns:1fr;} }
@@ -199,3 +199,104 @@ textarea{min-height: 90px;}
 .chips{ display:flex; flex-wrap:wrap; gap:8px; margin:8px 0 12px; }
 .chip{ border:1px solid var(--b); border-radius:999px; padding:8px 10px; font-weight:800; font-size:12px; background:#fff; }
 .chip.on{ background: rgba(61,61,61,.08); }
+
+/* RAPPORT STYLING */
+.report {
+  max-width: 800px;
+  margin: 0 auto;
+  padding: 40px;
+  background: #fff;
+  font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+  font-size: 11pt;
+  line-height: 1.6;
+  color: #2c3e50;
+}
+
+.report header {
+  border-bottom: 3px solid #3D3D3D;
+  padding-bottom: 20px;
+  margin-bottom: 30px;
+}
+
+.report h1 {
+  font-size: 24pt;
+  margin: 0 0 12px 0;
+  color: #3D3D3D;
+}
+
+.report h2 {
+  font-size: 16pt;
+  margin: 30px 0 14px 0;
+  color: #3D3D3D;
+  border-bottom: 2px solid #E51C66;
+  padding-bottom: 6px;
+}
+
+.report h3 {
+  font-size: 14pt;
+  margin: 20px 0 10px 0;
+  color: #3D3D3D;
+}
+
+.report h4 {
+  font-size: 12pt;
+  margin: 16px 0 8px 0;
+  color: #555;
+  font-weight: 600;
+}
+
+.report p {
+  margin: 0 0 12px 0;
+}
+
+.report ul, .report ol {
+  margin: 10px 0 16px 0;
+  padding-left: 24px;
+}
+
+.report li {
+  margin-bottom: 8px;
+}
+
+.report strong {
+  color: #2c3e50;
+  font-weight: 600;
+}
+
+.report .info {
+  background: #f8f9fa;
+  border-left: 4px solid #0DB28A;
+  padding: 12px 16px;
+  margin: 16px 0;
+  font-style: italic;
+  color: #555;
+}
+
+.report img {
+  max-width: 100%;
+  height: auto;
+  margin: 12px 0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+}
+
+.report section {
+  page-break-inside: avoid;
+  margin-bottom: 30px;
+}
+
+/* Utskriftsstil */
+@media print {
+  .report {
+    padding: 20px;
+    max-width: 100%;
+  }
+  
+  .report h2 {
+    page-break-after: avoid;
+  }
+  
+  .report section {
+    page-break-inside: avoid;
+  }
+}

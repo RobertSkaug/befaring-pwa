@@ -216,6 +216,11 @@ function init(){
   $("btnToFindings").addEventListener("click", () => showStep("findings"));
   $("btnBackToLocations").addEventListener("click", () => showStep("locations"));
 
+  // Eksport-knapper
+  $("btnExportPDF").addEventListener("click", exportToPDF);
+  $("btnExportEmail").addEventListener("click", exportAndEmail);
+  $("btnExportWord").addEventListener("click", exportToWord);
+
   // BRREG: orgnr input auto fetch
   $("orgnr").addEventListener("input", async (e) => {
     const v = digits(e.target.value);
@@ -1243,6 +1248,1256 @@ function readAsDataUrlConstrained(file, maxW = 1200, maxH = 1200, quality = 0.8)
     img.onerror = () => reject(new Error("Kunne ikke lese bilde"));
     reader.readAsDataURL(file);
   });
+}
+
+/* =========================
+   RAPPORTGENERERING
+========================= */
+
+function buildReportHtml(){
+  const today = formatDateNo(state.inspectionDate);
+  const customerName = esc(state.customer.name || "Ikke oppgitt");
+  const orgnr = esc(state.customer.orgnr || "—");
+  
+  // Deltakere - grupperes i KLP og Kunde
+  let klpList = "";
+  state.attendees.klp.forEach(a => {
+    if (a.name) {
+      klpList += `<li>${esc(a.name)}${a.title ? " – " + esc(a.title) : ""}</li>\n`;
+    }
+  });
+  
+  let customerList = "";
+  state.attendees.customer.forEach(a => {
+    if (a.name) {
+      customerList += `<li>${esc(a.name)}${a.title ? " – " + esc(a.title) : ""}</li>\n`;
+    }
+  });
+  
+  // Liste over objekter som er befart
+  let objectsList = "";
+  state.locations.forEach(loc => {
+    loc.buildings.forEach(bld => {
+      if (bld.label || loc.address){
+        const label = bld.label || "Bygg";
+        const addr = loc.address || "Adresse ikke oppgitt";
+        const buildingNo = bld.buildingNo ? ` (bygningsnr. ${esc(bld.buildingNo)})` : "";
+        objectsList += `<li><strong>${esc(label)}</strong>: ${esc(addr)}${buildingNo}</li>\n`;
+      }
+    });
+  });
+  
+  // Kapittel 1: Beskrivelse av bygg (ett avsnitt pr bygg)
+  let buildingsSection = "";
+  state.locations.forEach(loc => {
+    loc.buildings.forEach(bld => {
+      const label = esc(bld.label || "Bygg");
+      const addr = esc(loc.address || "—");
+      const buildingNo = esc(bld.buildingNo || "—");
+      
+      // Virksomhet (flere valgt) - vis som punktliste
+      let businessHtml = "";
+      if (bld.businessInBuilding && bld.businessInBuilding.length > 0){
+        businessHtml = "<ul>\n";
+        bld.businessInBuilding.forEach(bus => {
+          businessHtml += `  <li>${esc(bus)}</li>\n`;
+        });
+        businessHtml += "</ul>\n";
+      } else {
+        businessHtml = "<p>—</p>\n";
+      }
+      
+      // Areal: totalareal + fordeling per virksomhet
+      let areaHtml = "";
+      if (bld.areaM2) {
+        areaHtml = `<p><strong>Totalareal:</strong> ${esc(bld.areaM2)} m²</p>\n`;
+        
+        if (bld.areaBreakdown && Object.keys(bld.areaBreakdown).length > 0){
+          areaHtml += "<p><strong>Fordeling per virksomhet:</strong></p>\n<ul>\n";
+          Object.entries(bld.areaBreakdown).forEach(([k, v]) => {
+            areaHtml += `  <li>${esc(k)}: ${esc(v)} m²</li>\n`;
+          });
+          areaHtml += "</ul>\n";
+        }
+      } else {
+        areaHtml = "<p><strong>Areal:</strong> —</p>\n";
+      }
+      
+      // Byggeår, etasjer, konstruksjon
+      const buildYear = bld.buildYear ? esc(bld.buildYear) : "—";
+      const floors = bld.floors ? esc(bld.floors) : "—";
+      
+      // Konstruksjon
+      let constrHtml = "";
+      const constrParts = [];
+      if (bld.columns && bld.columns.length > 0) constrParts.push(`Søyler: ${bld.columns.join(", ")}`);
+      if (bld.beams && bld.beams.length > 0) constrParts.push(`Bjelker: ${bld.beams.join(", ")}`);
+      if (bld.deck && bld.deck.length > 0) constrParts.push(`Dekke: ${bld.deck.join(", ")}`);
+      if (bld.roof && bld.roof.length > 0) constrParts.push(`Tak: ${bld.roof.join(", ")}`);
+      if (bld.outerWall && bld.outerWall.length > 0) constrParts.push(`Yttervegg: ${bld.outerWall.join(", ")}`);
+      
+      if (constrParts.length > 0) {
+        constrHtml = `<p><strong>Konstruksjon:</strong> ${esc(constrParts.join("; "))}</p>\n`;
+      }
+      
+      // Materialer og beskyttelse - map codes til full labels
+      let materialsHtml = "";
+      if (bld.materials && bld.materials.length > 0) {
+        const materialLabels = bld.materials.map(code => {
+          const m = MATERIALS.find(x => x.code === code);
+          return m ? m.label : code;
+        });
+        materialsHtml = `<p><strong>Bygningsmaterialer:</strong> ${esc(materialLabels.join(", "))}</p>\n`;
+      }
+      
+      let protectionHtml = "";
+      if (bld.protection && bld.protection.length > 0) {
+        const protectionLabels = bld.protection.map(code => {
+          const p = PROTECTION.find(x => x.code === code);
+          return p ? p.label : code;
+        });
+        protectionHtml = `<p><strong>Beskyttelse:</strong> ${esc(protectionLabels.join(", "))}</p>\n`;
+      }
+      
+      buildingsSection += `
+<div class="report__building-meta">
+<h3>${label}</h3>
+<p><strong>Adresse:</strong> ${addr}</p>
+<p><strong>Bygningsnummer:</strong> ${buildingNo}</p>
+
+<p><strong>Virksomhet i bygg:</strong></p>
+${businessHtml}
+
+${areaHtml}
+
+<p><strong>Byggeår:</strong> ${buildYear}</p>
+<p><strong>Antall etasjer:</strong> ${floors}</p>
+${constrHtml}
+${materialsHtml}
+${protectionHtml}
+`;
+      
+      if (bld.description){
+        buildingsSection += `<p><strong>Bygningsbeskrivelse:</strong> ${esc(bld.description)}</p>\n`;
+      }
+      if (bld.safety){
+        buildingsSection += `<p><strong>Sikkerhetsforhold:</strong> ${esc(bld.safety)}</p>\n`;
+      }
+      if (bld.risk){
+        buildingsSection += `<p><strong>Generell risiko:</strong> ${esc(bld.risk)}</p>\n`;
+      }
+      
+      buildingsSection += `</div>\n`;
+    });
+  });
+  
+  // Kapittel 2: Avvik (MED bilder)
+  const avvikList = state.findings.filter(f => (f.type || "").toUpperCase() === "AVVIK");
+  let avvikSection = "";
+  avvikList.forEach((f, idx) => {
+    const num = idx + 1;
+    const loc = state.locations.find(l => l.id === f.locationId);
+    const bld = loc?.buildings.find(b => b.id === f.buildingId);
+    const buildingLabel = bld?.label || f.buildingHeading || "Bygg";
+    const buildingNo = bld?.buildingNo ? ` (${esc(bld.buildingNo)})` : "";
+    
+    const title = f.title ? esc(f.title) : "";
+    const desc = f.desc ? esc(f.desc) : "";
+    
+    // Severity badge med farge
+    let severityBadge = "";
+    if (f.severity) {
+      let severityLabel = f.severity;
+      let severityColor = "";
+      
+      if (f.severity.toLowerCase() === "lav") {
+        severityLabel = "Mindre";
+        severityColor = "background: #FFEB3B; color: #000;";
+      } else if (f.severity.toLowerCase() === "middels") {
+        severityLabel = "Middels";
+        severityColor = "background: #FF9800; color: #000;";
+      } else if (f.severity.toLowerCase() === "høy") {
+        severityLabel = "Alvorlig";
+        severityColor = "background: #F44336; color: #fff;";
+      }
+      
+      severityBadge = ` <span class="report__severity" style="${severityColor} padding: 2px 8px; border-radius: 3px; font-weight: 700; font-size: 10pt;">${severityLabel}</span>`;
+    }
+    
+    let dueDateText = "";
+    if (f.dueDate) dueDateText = `<p style="margin-top: 12px;"><strong>Frist for utbedring:</strong> ${formatDateNo(f.dueDate)}</p>`;
+    
+    // Bilder
+    let photosHtml = "";
+    if (f.photos && f.photos.length > 0) {
+      photosHtml = '<div style="margin-top: 12px;">';
+      f.photos.forEach(photo => {
+        const imgSrc = photo.reportDataUrl || photo.dataUrl;
+        photosHtml += `<img class="report__image" src="${imgSrc}" alt="Bilde for avvik 2.${num}" style="max-height: 8cm; margin: 8px 0;" />`;
+        if (photo.comment){
+          photosHtml += `<p class="report__image-caption">${esc(photo.comment)}</p>`;
+        }
+      });
+      photosHtml += '</div>';
+    }
+    
+    avvikSection += `
+<li>
+  <h3 style="background: transparent; padding: 0; margin: 16px 0 8px 0;">Referansenummer 2.${num}${severityBadge}</h3>
+  <div class="report__finding-building">${esc(buildingLabel)}${buildingNo}</div>
+  ${title ? `<p style="margin-top: 8px;"><strong>${title}</strong></p>` : ""}
+  ${desc ? `<p>${desc}</p>` : ""}
+  ${photosHtml}
+  ${dueDateText}
+</li>
+`;
+  });
+  
+  // Kapittel 3: Anbefalinger (MED bilder)
+  const anbList = state.findings.filter(f => (f.type || "").toUpperCase() === "ANBEFALING");
+  let anbSection = "";
+  anbList.forEach((f, idx) => {
+    const num = idx + 1;
+    const loc = state.locations.find(l => l.id === f.locationId);
+    const bld = loc?.buildings.find(b => b.id === f.buildingId);
+    const buildingLabel = bld?.label || f.buildingHeading || "Bygg";
+    const buildingNo = bld?.buildingNo ? ` (${esc(bld.buildingNo)})` : "";
+    
+    const title = f.title ? esc(f.title) : "";
+    const desc = f.desc ? esc(f.desc) : "";
+    
+    let dueDateText = "";
+    if (f.dueDate) dueDateText = `<p style="margin-top: 12px;"><strong>Frist for tilbakemelding:</strong> ${formatDateNo(f.dueDate)}</p>`;
+    
+    // Bilder
+    let photosHtml = "";
+    if (f.photos && f.photos.length > 0) {
+      photosHtml = '<div style="margin-top: 12px;">';
+      f.photos.forEach(photo => {
+        const imgSrc = photo.reportDataUrl || photo.dataUrl;
+        photosHtml += `<img class="report__image" src="${imgSrc}" alt="Bilde for anbefaling 3.${num}" style="max-height: 8cm; margin: 8px 0;" />`;
+        if (photo.comment){
+          photosHtml += `<p class="report__image-caption">${esc(photo.comment)}</p>`;
+        }
+      });
+      photosHtml += '</div>';
+    }
+    
+    anbSection += `
+<li>
+  <h3 style="background: transparent; padding: 0; margin: 16px 0 8px 0;">Referansenummer 3.${num}</h3>
+  <div class="report__finding-building">${esc(buildingLabel)}${buildingNo}</div>
+  ${title ? `<p style="margin-top: 8px;"><strong>${title}</strong></p>` : ""}
+  ${desc ? `<p>${desc}</p>` : ""}
+  ${photosHtml}
+  ${dueDateText}
+</li>
+`;
+  });
+  
+  // Kapittel 4 er fjernet - bilder vises nå inline i avvik og anbefalinger
+
+  // Bygg komplett HTML med KLP-profil og embedded CSS
+  return `<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Befaringsrapport – ${customerName}</title>
+  <style>
+/* KLP-profilert rapportlayout - Printvennlig */
+@page {
+  size: A4 portrait;
+  margin: 2.5cm 2.5cm 2cm 2.5cm;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 11pt;
+  line-height: 1.6;
+  color: #333;
+  background: #f5f5f5;
+}
+
+.report {
+  width: 21cm;
+  min-height: 29.7cm;
+  margin: 20px auto;
+  padding: 2.5cm 2.5cm 2cm 2.5cm;
+  background: #fff;
+  box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  position: relative;
+}
+
+/* Logo øverst på alle sider */
+.report__logo {
+  position: absolute;
+  top: 0.3cm;
+  right: 2.5cm;
+  width: 102px;
+  z-index: 1000;
+}
+
+.report__logo img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.report__header {
+  background: #F0F0F0;
+  border: 1px solid #ddd;
+  border-radius: 4px;
+  padding: 20px;
+  margin-bottom: 30px;
+  position: relative;
+  overflow: hidden;
+}
+
+.report__header h1 {
+  font-family: Georgia, serif;
+  font-size: 20pt;
+  font-weight: 700;
+  color: #3D3D3D;
+  margin: 0 0 12px 0;
+  line-height: 1.3;
+}
+
+.report__meta {
+  font-family: Arial, 'Helvetica Neue', sans-serif;
+  font-size: 10pt;
+  line-height: 1.5;
+  color: #3D3D3D;
+  margin: 8px 0;
+}
+
+.report__meta strong {
+  font-weight: 700;
+  color: #3D3D3D;
+}
+
+.report__attendees {
+  margin-top: 16px;
+}
+
+.report__attendees h3 {
+  font-family: Georgia, serif;
+  font-size: 12pt;
+  font-weight: 700;
+  color: #3D3D3D;
+  margin: 12px 0 6px 0;
+}
+
+.report__attendees ul {
+  list-style: none;
+  padding: 0;
+  margin: 0 0 8px 0;
+}
+
+.report__attendees li {
+  font-family: Arial, sans-serif;
+  font-size: 10pt;
+  padding: 3px 0;
+  color: #3D3D3D;
+}
+
+.report h2 {
+  font-family: Georgia, serif;
+  font-size: 14pt;
+  font-weight: 700;
+  color: #3D3D3D;
+  margin: 32px 0 14px 0;
+  padding-bottom: 6px;
+  border-bottom: 2px solid #3D3D3D;
+  page-break-after: avoid;
+}
+
+.report h3 {
+  font-family: Georgia, serif;
+  font-size: 12pt;
+  font-weight: 700;
+  color: #3D3D3D;
+  margin: 20px 0 10px 0;
+  background: #CDFAE2;
+  padding: 8px 12px;
+  border-radius: 3px;
+  page-break-after: avoid;
+}
+
+.report h4 {
+  font-family: Arial, sans-serif;
+  font-size: 10pt;
+  font-weight: 700;
+  color: #3D3D3D;
+  margin: 16px 0 8px 0;
+}
+
+.report p {
+  font-family: Georgia, serif;
+  font-size: 11pt;
+  line-height: 1.6;
+  margin: 0 0 12px 0;
+  text-align: left;
+  color: #333;
+}
+
+.report ul,
+.report ol {
+  margin: 12px 0 16px 0;
+  padding-left: 24px;
+  font-family: Georgia, serif;
+  font-size: 11pt;
+  line-height: 1.6;
+}
+
+.report li {
+  margin-bottom: 8px;
+  color: #333;
+}
+
+.report__objects {
+  background: #F0F0F0;
+  padding: 16px 20px;
+  border-left: 4px solid #CDFAE2;
+  border-radius: 3px;
+  margin: 16px 0;
+}
+
+.report__objects ul {
+  margin: 0;
+}
+
+.report__infobox {
+  background: #FFE1E1;
+  border-left: 4px solid #3D3D3D;
+  padding: 14px 18px;
+  margin: 16px 0;
+  border-radius: 3px;
+}
+
+.report__infobox p {
+  margin: 0 0 8px 0;
+  font-size: 10.5pt;
+  font-style: italic;
+  color: #555;
+}
+
+.report__infobox p:last-child {
+  margin-bottom: 0;
+}
+
+.report__building-meta {
+  font-family: Arial, sans-serif;
+  font-size: 10pt;
+  line-height: 1.5;
+  margin: 12px 0 24px 0;
+}
+
+.report__building-meta p {
+  font-family: Arial, sans-serif;
+  font-size: 10pt;
+  margin: 6px 0;
+}
+
+.report__building-meta ul {
+  font-family: Arial, sans-serif;
+  font-size: 10pt;
+  margin: 6px 0;
+}
+
+.report__findings ol {
+  counter-reset: item;
+  list-style-type: none;
+  padding-left: 0;
+}
+
+.report__findings li {
+  counter-increment: item;
+  margin-bottom: 16px;
+  padding-left: 0;
+}
+
+.report__findings li::before {
+  content: counter(item) ". ";
+  font-weight: 700;
+  color: #3D3D3D;
+  font-family: Arial, sans-serif;
+}
+
+.report__finding-title {
+  font-weight: 700;
+  color: #3D3D3D;
+  font-family: Georgia, serif;
+  font-size: 11pt;
+}
+
+.report__finding-building {
+  font-family: Arial, sans-serif;
+  font-size: 9pt;
+  color: #666;
+  font-style: italic;
+  margin-bottom: 4px;
+}
+
+.report__image {
+  max-width: 100%;
+  max-height: 10cm;
+  height: auto;
+  display: block;
+  margin: 16px 0 8px 0;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  page-break-inside: avoid;
+}
+
+.report__image-caption {
+  font-family: Arial, sans-serif;
+  font-size: 9pt;
+  color: #666;
+  font-style: italic;
+  margin: 0 0 16px 0;
+}
+
+.report section {
+  margin-bottom: 24px;
+}
+
+.report strong {
+  font-weight: 700;
+  color: #3D3D3D;
+}
+
+/* Print-optimalisering */
+@media print {
+  body {
+    background: #fff;
+  }
+  
+  .report {
+    width: 100%;
+    margin: 0;
+    padding: 2.5cm 2.5cm 2cm 2.5cm;
+    box-shadow: none;
+    min-height: 0;
+  }
+  
+  /* Logo vises øverst på alle sider */
+  .report__logo {
+    position: fixed;
+    top: 0.2cm;
+    right: 2.5cm;
+    z-index: 9999;
+  }
+  
+  .report h2 {
+    page-break-after: avoid;
+  }
+  
+  .report h3,
+  .report h4 {
+    page-break-after: avoid;
+  }
+  
+  .report section {
+    page-break-inside: avoid;
+  }
+  
+  .report__image {
+    page-break-inside: avoid;
+    page-break-after: auto;
+  }
+  
+  .report__infobox {
+    background: #f9f9f9;
+    border-left: 3px solid #000;
+  }
+  
+  .report h3 {
+    background: #f0f0f0;
+  }
+}
+
+/* Skjerm-visning */
+@media screen {
+  .report {
+    box-shadow: 0 0 10px rgba(0,0,0,0.1);
+  }
+}
+  </style>
+</head>
+<body>
+<article class="report">
+
+<!-- Logo (vises øverst på alle sider ved print) -->
+<div class="report__logo">
+  <img src="./icons/KLP_logo_koksgraa.png" alt="KLP Logo" />
+</div>
+
+<!-- Header / Faktaboks -->
+<div class="report__header">
+  <h1>Befaringsrapport – Risikogjennomgang</h1>
+  <div class="report__meta"><strong>Dato:</strong> ${today}</div>
+  <div class="report__meta"><strong>Kunde:</strong> ${customerName} (org.nr: ${orgnr})</div>
+  
+  <div class="report__attendees">
+    <h3>Deltakere fra KLP:</h3>
+    <ul>${klpList || "<li><em>Ingen registrert</em></li>"}</ul>
+    
+    <h3>Deltakere fra kunde:</h3>
+    <ul>${customerList || "<li><em>Ingen registrert</em></li>"}</ul>
+  </div>
+</div>
+
+<!-- Formålet med befaringen -->
+<section>
+  <h2>Formålet med befaringen</h2>
+
+  <p>
+    KLP Skadeforsikring AS forsikrer ${customerName} sine bygninger, 
+    og vi har derfor, sammen med dere, gjennomført en befaring ved bygg nevnt nedenfor.
+  </p>
+
+  <p>
+    Rapporten oppsummerer de forholdene som ble kommentert under befaringen med fokus på 
+    å identifisere risikoforhold og gi anbefalinger for å redusere sannsynlighet for skade.
+  </p>
+
+  <p>
+    Det er derfor gjennomført befaring ved følgende objekter:
+  </p>
+
+  <div class="report__objects">
+    <ul>
+      ${objectsList || "<li><em>Ingen objekter registrert</em></li>"}
+    </ul>
+  </div>
+</section>
+
+<!-- Innholdet i befaringsrapporten -->
+<section>
+  <h2>Innholdet i befaringsrapporten</h2>
+  <p>
+    Beskrivelse av det eller de byggene som er befart, herunder bygningens størrelse, 
+    konstruksjon, virksomhet og installerte sikkerhetssystemer. Rapporten dokumenterer 
+    avvik og anbefalinger knyttet til risikoforhold som ble observert under befaringen.
+  </p>
+</section>
+
+<!-- 1. Beskrivelse av bygg -->
+<section>
+  <h2>1. Beskrivelse av bygg</h2>
+  ${buildingsSection || "<p><em>Ingen bygg registrert</em></p>"}
+</section>
+
+<!-- 2. Avvik ved risikoforhold -->
+<section class="report__findings">
+  <h2>2. Avvik ved risikoforhold</h2>
+
+  <div class="report__infobox">
+    <p>
+      Angitte avvik beskriver de viktigste risikoforholdene som ble observert under befaringen. 
+      Avvikene bør følges opp og utbedres for å redusere risiko for skade.
+    </p>
+  </div>
+
+  <ol>
+    ${avvikSection || "<li><em>Ingen avvik registrert</em></li>"}
+  </ol>
+</section>
+
+<!-- 3. Anbefalinger -->
+<section class="report__findings">
+  <h2>3. Anbefalinger</h2>
+
+  <div class="report__infobox">
+    <p>
+      Angitte anbefalinger beskriver tiltak som kan bidra til å redusere risiko og 
+      forbedre sikkerheten ved bygget.
+    </p>
+  </div>
+
+  <ol>
+    ${anbSection || "<li><em>Ingen anbefalinger registrert</em></li>"}
+  </ol>
+</section>
+
+<!-- 4. Forsikringsavtalen -->
+<section>
+  <h2>4. Forsikringsavtalen</h2>
+  <p>
+    I forsikringsavtalen er det ansvarsbegrensninger om hva som må meldes fra om ved endring av risikoen. Dette gjelder blant annet dersom:
+  </p>
+  <ul>
+    <li>Bygningens verdi øker etter påbygging eller ombygging</li>
+    <li>Bygningen blir benyttet til annet formål enn avtalt</li>
+  </ul>
+  <p>
+    Det er kundens ansvar å melde fra om dette. Dersom dette ikke gjøres, kan retten til erstatning bortfalle helt eller delvis, jf. forsikringsavtaleloven (FAL) § 4-6.
+  </p>
+</section>
+
+<!-- 5. Forsikringsvilkårene – Sikkerhetsforskrifter -->
+<section>
+  <h2>5. Forsikringsvilkårene – Sikkerhetsforskrifter</h2>
+  <p>
+    I forsikringsvilkårene er det sikkerhetsforskrifter som sier hva som må gjøres for å begrense eller unngå skader. 
+    Erstatningen kan bli redusert eller falle bort hvis sikkerhetsforskriftene ikke overholdes jf. forsikringsavtaleloven (FAL) § 4-8.
+  </p>
+  
+  <p><strong>Noen sentrale sikkerhetsforskrifter:</strong></p>
+  
+  <p><strong>Brann</strong></p>
+  <ul>
+    <li>Det er krav til utendørs plassering og oppbevaring av avfallsbeholdere og brennbart materiale. Det skal plasseres slik at en brann ikke kan smitte til byggverk, og minst 5 meter fra brennbar yttervegg. Flyttbare avfallsbeholdere skal være fastmontert</li>
+    <li>Utendørs lagring av brennbart materiale som for eksempel trelast, trepaller, flis, plast, papir og lignende, skal skje minst 8 meter fra byggverk</li>
+    <li>Lagring med høyde over 4 meter eller større areal enn 200 kvm, skal plasseres minst 25 meter fra byggverk</li>
+    <li>Særskilte krav gjelder ved varme arbeider, og den som utfører arbeidet må ha gyldig sertifikat for det</li>
+    <li>Ansatte skal være orientert om brannforebyggende tiltak, bruk av slokkeutstyr og alarmer</li>
+    <li>Brannskillende bygningskonstruksjoner inkludert dører og porter skal være utført og holdt i funksjonsmessig stand</li>
+    <li>Slokkeutstyr skal være tilstrekkelig og godt merket, og kontroll skal foretas minst en gang per år</li>
+    <li>Særskilte krav ved varme arbeider, og krav om sertifikat ved utførelse av arbeidet</li>
+  </ul>
+  
+  <p><strong>Vann</strong></p>
+  <ul>
+    <li>Bygning skal holdes tilstrekkelig oppvarmet for å unngå frostskader</li>
+    <li>Særskilte krav til fraflyttede bygninger</li>
+    <li>Varer skal lagres minst 10 cm over gulv</li>
+  </ul>
+  
+  <p><strong>Tyveri</strong></p>
+  <ul>
+    <li>Det er krav til at sikring av dører, vinduer, porter, luker og lignende er i henhold til krav fra FG Skadeteknikk (FGs) regelverk</li>
+  </ul>
+  
+  <p><strong>Bygningsarbeid og reparasjoner</strong></p>
+  <ul>
+    <li>Det er krav til forskriftsmessig utførelse av bygningsarbeid og reparasjoner</li>
+    <li>Det er krav til skadeforebyggende tiltak under bygging, ombygging og rehabilitering</li>
+  </ul>
+</section>
+
+</article>
+</body>
+</html>`;
+}
+
+/* =========================
+   EKSPORT-FUNKSJONER
+========================= */
+
+// Bygg kun rapport-innhold (body HTML) - for print med ekstern CSS
+function buildReportContent() {
+  const today = formatDateNo(state.inspectionDate);
+  const customerName = esc(state.customer.name || "Ikke oppgitt");
+  const orgnr = esc(state.customer.orgnr || "—");
+  
+  // Deltakere - grupperes i KLP og Kunde
+  let klpList = "";
+  state.attendees.klp.forEach(a => {
+    if (a.name) {
+      klpList += `<li>${esc(a.name)}${a.title ? " – " + esc(a.title) : ""}</li>\n`;
+    }
+  });
+  
+  let customerList = "";
+  state.attendees.customer.forEach(a => {
+    if (a.name) {
+      customerList += `<li>${esc(a.name)}${a.title ? " – " + esc(a.title) : ""}</li>\n`;
+    }
+  });
+  
+  // Liste over objekter som er befart
+  let objectsList = "";
+  state.locations.forEach(loc => {
+    loc.buildings.forEach(bld => {
+      if (bld.label || loc.address){
+        const label = bld.label || "Bygg";
+        const addr = loc.address || "Adresse ikke oppgitt";
+        const buildingNo = bld.buildingNo ? ` (bygningsnr. ${esc(bld.buildingNo)})` : "";
+        objectsList += `<li><strong>${esc(label)}</strong>: ${esc(addr)}${buildingNo}</li>\n`;
+      }
+    });
+  });
+  
+  // Kapittel 1: Beskrivelse av bygg (ett avsnitt pr bygg)
+  let buildingsSection = "";
+  state.locations.forEach(loc => {
+    loc.buildings.forEach(bld => {
+      const label = esc(bld.label || "Bygg");
+      const addr = esc(loc.address || "—");
+      const buildingNo = esc(bld.buildingNo || "—");
+      
+      // Virksomhet (flere valgt) - vis som punktliste
+      let businessHtml = "";
+      if (bld.businessInBuilding && bld.businessInBuilding.length > 0){
+        businessHtml = "<ul>\n";
+        bld.businessInBuilding.forEach(bus => {
+          businessHtml += `  <li>${esc(bus)}</li>\n`;
+        });
+        businessHtml += "</ul>\n";
+      } else {
+        businessHtml = "<p>—</p>\n";
+      }
+      
+      // Areal: totalareal + fordeling per virksomhet
+      let areaHtml = "";
+      if (bld.areaM2) {
+        areaHtml = `<p><strong>Totalareal:</strong> ${esc(bld.areaM2)} m²</p>\n`;
+        
+        if (bld.areaBreakdown && Object.keys(bld.areaBreakdown).length > 0){
+          areaHtml += "<p><strong>Fordeling per virksomhet:</strong></p>\n<ul>\n";
+          Object.entries(bld.areaBreakdown).forEach(([k, v]) => {
+            areaHtml += `  <li>${esc(k)}: ${esc(v)} m²</li>\n`;
+          });
+          areaHtml += "</ul>\n";
+        }
+      } else {
+        areaHtml = "<p><strong>Areal:</strong> —</p>\n";
+      }
+      
+      // Byggeår, etasjer, konstruksjon
+      const buildYear = bld.buildYear ? esc(bld.buildYear) : "—";
+      const floors = bld.floors ? esc(bld.floors) : "—";
+      
+      // Konstruksjon
+      let constrHtml = "";
+      const constrParts = [];
+      if (bld.columns && bld.columns.length > 0) constrParts.push(`Søyler: ${bld.columns.join(", ")}`);
+      if (bld.beams && bld.beams.length > 0) constrParts.push(`Bjelker: ${bld.beams.join(", ")}`);
+      if (bld.deck && bld.deck.length > 0) constrParts.push(`Dekke: ${bld.deck.join(", ")}`);
+      if (bld.roof && bld.roof.length > 0) constrParts.push(`Tak: ${bld.roof.join(", ")}`);
+      if (bld.outerWall && bld.outerWall.length > 0) constrParts.push(`Yttervegg: ${bld.outerWall.join(", ")}`);
+      
+      if (constrParts.length > 0) {
+        constrHtml = `<p><strong>Konstruksjon:</strong> ${esc(constrParts.join("; "))}</p>\n`;
+      }
+      
+      // Materialer og beskyttelse - map codes til full labels
+      let materialsHtml = "";
+      if (bld.materials && bld.materials.length > 0) {
+        const materialLabels = bld.materials.map(code => {
+          const m = MATERIALS.find(x => x.code === code);
+          return m ? m.label : code;
+        });
+        materialsHtml = `<p><strong>Bygningsmaterialer:</strong> ${esc(materialLabels.join(", "))}</p>\n`;
+      }
+      
+      let protectionHtml = "";
+      if (bld.protection && bld.protection.length > 0) {
+        const protectionLabels = bld.protection.map(code => {
+          const p = PROTECTION.find(x => x.code === code);
+          return p ? p.label : code;
+        });
+        protectionHtml = `<p><strong>Beskyttelse:</strong> ${esc(protectionLabels.join(", "))}</p>\n`;
+      }
+      
+      buildingsSection += `
+<div class="report__building-meta avoid-break">
+<h3>${label}</h3>
+<p><strong>Adresse:</strong> ${addr}</p>
+<p><strong>Bygningsnummer:</strong> ${buildingNo}</p>
+
+<p><strong>Virksomhet i bygg:</strong></p>
+${businessHtml}
+
+${areaHtml}
+
+<p><strong>Byggeår:</strong> ${buildYear}</p>
+<p><strong>Antall etasjer:</strong> ${floors}</p>
+${constrHtml}
+${materialsHtml}
+${protectionHtml}
+`;
+      
+      if (bld.description){
+        buildingsSection += `<p><strong>Bygningsbeskrivelse:</strong> ${esc(bld.description)}</p>\n`;
+      }
+      if (bld.safety){
+        buildingsSection += `<p><strong>Sikkerhetsforhold:</strong> ${esc(bld.safety)}</p>\n`;
+      }
+      if (bld.risk){
+        buildingsSection += `<p><strong>Generell risiko:</strong> ${esc(bld.risk)}</p>\n`;
+      }
+      
+      buildingsSection += `</div>\n`;
+    });
+  });
+  
+  // Kapittel 2: Avvik (MED bilder)
+  const avvikList = state.findings.filter(f => (f.type || "").toUpperCase() === "AVVIK");
+  let avvikSection = "";
+  avvikList.forEach((f, idx) => {
+    const num = idx + 1;
+    const loc = state.locations.find(l => l.id === f.locationId);
+    const bld = loc?.buildings.find(b => b.id === f.buildingId);
+    const buildingLabel = bld?.label || f.buildingHeading || "Bygg";
+    const buildingNo = bld?.buildingNo ? ` (${esc(bld.buildingNo)})` : "";
+    
+    const title = f.title ? esc(f.title) : "";
+    const desc = f.desc ? esc(f.desc) : "";
+    
+    // Severity badge med farge
+    let severityBadge = "";
+    if (f.severity) {
+      let severityLabel = f.severity;
+      let severityColor = "";
+      
+      if (f.severity.toLowerCase() === "lav") {
+        severityLabel = "Mindre";
+        severityColor = "background: #FFEB3B; color: #000;";
+      } else if (f.severity.toLowerCase() === "middels") {
+        severityLabel = "Middels";
+        severityColor = "background: #FF9800; color: #000;";
+      } else if (f.severity.toLowerCase() === "høy") {
+        severityLabel = "Alvorlig";
+        severityColor = "background: #F44336; color: #fff;";
+      }
+      
+      severityBadge = ` <span class="report__severity" style="${severityColor} padding: 2px 8px; border-radius: 3px; font-weight: 700; font-size: 10pt;">${severityLabel}</span>`;
+    }
+    
+    let dueDateText = "";
+    if (f.dueDate) dueDateText = `<p style="margin-top: 3mm;"><strong>Frist for utbedring:</strong> ${formatDateNo(f.dueDate)}</p>`;
+    
+    // Bilder
+    let photosHtml = "";
+    if (f.photos && f.photos.length > 0) {
+      photosHtml = '<div style="margin-top: 3mm;">';
+      f.photos.forEach(photo => {
+        const imgSrc = photo.reportDataUrl || photo.dataUrl;
+        photosHtml += `<figure class="avoid-break"><img class="report__image" src="${imgSrc}" alt="Bilde for avvik 2.${num}" />`;
+        if (photo.comment){
+          photosHtml += `<figcaption class="report__image-caption">${esc(photo.comment)}</figcaption>`;
+        }
+        photosHtml += `</figure>`;
+      });
+      photosHtml += '</div>';
+    }
+    
+    avvikSection += `
+<li class="avoid-break">
+  <h3 style="background: transparent; padding: 0; margin: 4mm 0 2mm 0;">Referansenummer 2.${num}${severityBadge}</h3>
+  <div class="report__finding-building">${esc(buildingLabel)}${buildingNo}</div>
+  ${title ? `<p style="margin-top: 2mm;"><strong>${title}</strong></p>` : ""}
+  ${desc ? `<p>${desc}</p>` : ""}
+  ${photosHtml}
+  ${dueDateText}
+</li>
+`;
+  });
+  
+  // Kapittel 3: Anbefalinger (MED bilder)
+  const anbList = state.findings.filter(f => (f.type || "").toUpperCase() === "ANBEFALING");
+  let anbSection = "";
+  anbList.forEach((f, idx) => {
+    const num = idx + 1;
+    const loc = state.locations.find(l => l.id === f.locationId);
+    const bld = loc?.buildings.find(b => b.id === f.buildingId);
+    const buildingLabel = bld?.label || f.buildingHeading || "Bygg";
+    const buildingNo = bld?.buildingNo ? ` (${esc(bld.buildingNo)})` : "";
+    
+    const title = f.title ? esc(f.title) : "";
+    const desc = f.desc ? esc(f.desc) : "";
+    
+    let dueDateText = "";
+    if (f.dueDate) dueDateText = `<p style="margin-top: 3mm;"><strong>Frist for tilbakemelding:</strong> ${formatDateNo(f.dueDate)}</p>`;
+    
+    // Bilder
+    let photosHtml = "";
+    if (f.photos && f.photos.length > 0) {
+      photosHtml = '<div style="margin-top: 3mm;">';
+      f.photos.forEach(photo => {
+        const imgSrc = photo.reportDataUrl || photo.dataUrl;
+        photosHtml += `<figure class="avoid-break"><img class="report__image" src="${imgSrc}" alt="Bilde for anbefaling 3.${num}" />`;
+        if (photo.comment){
+          photosHtml += `<figcaption class="report__image-caption">${esc(photo.comment)}</figcaption>`;
+        }
+        photosHtml += `</figure>`;
+      });
+      photosHtml += '</div>';
+    }
+    
+    anbSection += `
+<li class="avoid-break">
+  <h3 style="background: transparent; padding: 0; margin: 4mm 0 2mm 0;">Referansenummer 3.${num}</h3>
+  <div class="report__finding-building">${esc(buildingLabel)}${buildingNo}</div>
+  ${title ? `<p style="margin-top: 2mm;"><strong>${title}</strong></p>` : ""}
+  ${desc ? `<p>${desc}</p>` : ""}
+  ${photosHtml}
+  ${dueDateText}
+</li>
+`;
+  });
+  
+  // Returner kun body-innholdet (for print med ekstern CSS)
+  return `<article class="report">
+
+<!-- Header / Faktaboks -->
+<div class="report__header">
+  <h1>Befaringsrapport – Risikogjennomgang</h1>
+  <div class="report__meta"><strong>Dato:</strong> ${today}</div>
+  <div class="report__meta"><strong>Kunde:</strong> ${customerName} (org.nr: ${orgnr})</div>
+  
+  <div class="report__attendees">
+    <h3>Deltakere fra KLP:</h3>
+    <ul>${klpList || "<li><em>Ingen registrert</em></li>"}</ul>
+    
+    <h3>Deltakere fra kunde:</h3>
+    <ul>${customerList || "<li><em>Ingen registrert</em></li>"}</ul>
+  </div>
+</div>
+
+<!-- Formålet med befaringen -->
+<section>
+  <h2>Formålet med befaringen</h2>
+
+  <p>
+    KLP Skadeforsikring AS forsikrer ${customerName} sine bygninger, 
+    og vi har derfor, sammen med dere, gjennomført en befaring ved bygg nevnt nedenfor.
+  </p>
+
+  <p>
+    Rapporten oppsummerer de forholdene som ble kommentert under befaringen med fokus på 
+    å identifisere risikoforhold og gi anbefalinger for å redusere sannsynlighet for skade.
+  </p>
+
+  <p>
+    Det er derfor gjennomført befaring ved følgende objekter:
+  </p>
+
+  <div class="report__objects">
+    <ul>
+      ${objectsList || "<li><em>Ingen objekter registrert</em></li>"}
+    </ul>
+  </div>
+</section>
+
+<!-- Innholdet i befaringsrapporten -->
+<section>
+  <h2>Innholdet i befaringsrapporten</h2>
+  <p>
+    Beskrivelse av det eller de byggene som er befart, herunder bygningens størrelse, 
+    konstruksjon, virksomhet og installerte sikkerhetssystemer. Rapporten dokumenterer 
+    avvik og anbefalinger knyttet til risikoforhold som ble observert under befaringen.
+  </p>
+</section>
+
+<!-- 1. Beskrivelse av bygg -->
+<section>
+  <h2>1. Beskrivelse av bygg</h2>
+  ${buildingsSection || "<p><em>Ingen bygg registrert</em></p>"}
+</section>
+
+<!-- 2. Avvik ved risikoforhold -->
+<section class="report__findings">
+  <h2>2. Avvik ved risikoforhold</h2>
+
+  <div class="report__infobox">
+    <p>
+      Angitte avvik beskriver de viktigste risikoforholdene som ble observert under befaringen. 
+      Avvikene bør følges opp og utbedres for å redusere risiko for skade.
+    </p>
+  </div>
+
+  <ol>
+    ${avvikSection || "<li><em>Ingen avvik registrert</em></li>"}
+  </ol>
+</section>
+
+<!-- 3. Anbefalinger -->
+<section class="report__findings">
+  <h2>3. Anbefalinger</h2>
+
+  <div class="report__infobox">
+    <p>
+      Angitte anbefalinger beskriver tiltak som kan bidra til å redusere risiko og 
+      forbedre sikkerheten ved bygget.
+    </p>
+  </div>
+
+  <ol>
+    ${anbSection || "<li><em>Ingen anbefalinger registrert</em></li>"}
+  </ol>
+</section>
+
+<!-- 4. Forsikringsavtalen -->
+<section>
+  <h2>4. Forsikringsavtalen</h2>
+  <p>
+    I forsikringsavtalen er det ansvarsbegrensninger om hva som må meldes fra om ved endring av risikoen. Dette gjelder blant annet dersom:
+  </p>
+  <ul>
+    <li>Bygningens verdi øker etter påbygging eller ombygging</li>
+    <li>Bygningen blir benyttet til annet formål enn avtalt</li>
+  </ul>
+  <p>
+    Det er kundens ansvar å melde fra om dette. Dersom dette ikke gjøres, kan retten til erstatning bortfalle helt eller delvis, jf. forsikringsavtaleloven (FAL) § 4-6.
+  </p>
+</section>
+
+<!-- 5. Forsikringsvilkårene – Sikkerhetsforskrifter -->
+<section>
+  <h2>5. Forsikringsvilkårene – Sikkerhetsforskrifter</h2>
+  <p>
+    I forsikringsvilkårene er det sikkerhetsforskrifter som sier hva som må gjøres for å begrense eller unngå skader. 
+    Erstatningen kan bli redusert eller falle bort hvis sikkerhetsforskriftene ikke overholdes jf. forsikringsavtaleloven (FAL) § 4-8.
+  </p>
+  
+  <p><strong>Noen sentrale sikkerhetsforskrifter:</strong></p>
+  
+  <p><strong>Brann</strong></p>
+  <ul>
+    <li>Det er krav til utendørs plassering og oppbevaring av avfallsbeholdere og brennbart materiale. Det skal plasseres slik at en brann ikke kan smitte til byggverk, og minst 5 meter fra brennbar yttervegg. Flyttbare avfallsbeholdere skal være fastmontert</li>
+    <li>Utendørs lagring av brennbart materiale som for eksempel trelast, trepaller, flis, plast, papir og lignende, skal skje minst 8 meter fra byggverk</li>
+    <li>Lagring med høyde over 4 meter eller større areal enn 200 kvm, skal plasseres minst 25 meter fra byggverk</li>
+    <li>Særskilte krav gjelder ved varme arbeider, og den som utfører arbeidet må ha gyldig sertifikat for det</li>
+    <li>Ansatte skal være orientert om brannforebyggende tiltak, bruk av slokkeutstyr og alarmer</li>
+    <li>Brannskillende bygningskonstruksjoner inkludert dører og porter skal være utført og holdt i funksjonsmessig stand</li>
+    <li>Slokkeutstyr skal være tilstrekkelig og godt merket, og kontroll skal foretas minst en gang per år</li>
+    <li>Særskilte krav ved varme arbeider, og krav om sertifikat ved utførelse av arbeidet</li>
+  </ul>
+  
+  <p><strong>Vann</strong></p>
+  <ul>
+    <li>Bygning skal holdes tilstrekkelig oppvarmet for å unngå frostskader</li>
+    <li>Særskilte krav til fraflyttede bygninger</li>
+    <li>Varer skal lagres minst 10 cm over gulv</li>
+  </ul>
+  
+  <p><strong>Tyveri</strong></p>
+  <ul>
+    <li>Det er krav til at sikring av dører, vinduer, porter, luker og lignende er i henhold til krav fra FG Skadeteknikk (FGs) regelverk</li>
+  </ul>
+  
+  <p><strong>Bygningsarbeid og reparasjoner</strong></p>
+  <ul>
+    <li>Det er krav til forskriftsmessig utførelse av bygningsarbeid og reparasjoner</li>
+    <li>Det er krav til skadeforebyggende tiltak under bygging, ombygging og rehabilitering</li>
+  </ul>
+</section>
+
+</article>`;
+}
+
+async function printReport(reportHtml) {
+  // Fetch report.css som tekst (cache bust)
+  const reportCss = await fetch("./report.css", { cache: "no-store" })
+    .then(r => r.text())
+    .catch(() => "");
+
+  // Print-spesifikke CSS regler
+  const printCss = `
+    @page { size: A4; margin: 16mm; }
+    @media print {
+      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
+      html, body { background:#fff !important; }
+      img { max-width: 100% !important; height: auto !important; }
+      .no-print { display:none !important; }
+      .avoid-break { break-inside: avoid; page-break-inside: avoid; }
+      h1,h2,h3 { break-after: avoid-page; page-break-after: avoid; }
+    }
+  `;
+
+  // Åpne nytt vindu og injiser CSS + HTML
+  const w = window.open("", "_blank");
+  if (!w) {
+    alert("Kunne ikke åpne vindu. Sjekk popup-blokkering.");
+    return;
+  }
+  
+  w.document.open();
+  w.document.write(`<!doctype html><html><head><meta charset="utf-8">
+    <style>${reportCss}</style><style>${printCss}</style>
+    </head><body>${reportHtml}</body></html>`);
+  w.document.close();
+  w.focus();
+  
+  // Vent på at bilder lastes før print-dialog åpnes
+  setTimeout(() => w.print(), 200);
+}
+
+async function exportToPDF(){
+  const html = buildReportContent();
+  await printReport(html);
+}
+
+async function exportToWord(){
+  const html = buildReportHtml();
+  
+  const blob = new Blob([html], {
+    type: "application/msword"
+  });
+  
+  const filename = `Befaringsrapport-${state.customer.name || "rapport"}-${state.inspectionDate}.doc`;
+  
+  if (navigator.share && navigator.canShare && navigator.canShare({ files: [new File([blob], filename, { type: blob.type })] })){
+    try {
+      const file = new File([blob], filename, { type: blob.type });
+      await navigator.share({
+        title: "Befaringsrapport – Risikogjennomgang",
+        text: `Befaringsrapport for ${state.customer.name || "kunde"} datert ${formatDateNo(state.inspectionDate)}.`,
+        files: [file]
+      });
+    } catch (err){
+      if (err.name !== "AbortError"){
+        // Fallback: last ned
+        downloadFile(blob, filename);
+      }
+    }
+  } else {
+    // Fallback: last ned
+    downloadFile(blob, filename);
+  }
+}
+
+async function exportAndEmail(){
+  const html = buildReportHtml();
+  
+  const blob = new Blob([html], {
+    type: "application/msword"
+  });
+  
+  const filename = `Befaringsrapport-${state.customer.name || "rapport"}-${formatDateNo(state.inspectionDate)}.doc`;
+  
+  if (navigator.share && navigator.canShare){
+    try {
+      const file = new File([blob], filename, { type: blob.type });
+      
+      // Sjekk om filer kan deles
+      if (navigator.canShare({ files: [file] })){
+        await navigator.share({
+          title: "Befaringsrapport – Risikogjennomgang",
+          text: `Vedlagt befaringsrapport for ${state.customer.name || "kunde"} datert ${formatDateNo(state.inspectionDate)}.\n\nKLP Skadeforsikring AS`,
+          files: [file]
+        });
+      } else {
+        // Ingen fil-deling, prøv bare tekst+URL
+        await navigator.share({
+          title: "Befaringsrapport – Risikogjennomgang",
+          text: `Befaringsrapport for ${state.customer.name || "kunde"} datert ${formatDateNo(state.inspectionDate)}.\n\nOBS: Denne enheten støtter ikke automatisk vedlegg. Last ned rapporten separat med knappen "Last ned Word".`
+        });
+      }
+    } catch (err){
+      if (err.name !== "AbortError"){
+        alert("Kunne ikke dele rapport. Prøv å laste ned og dele manuelt.");
+      }
+    }
+  } else {
+    // Ingen Web Share API
+    alert("Deling via e-post støttes ikke på denne enheten.\n\nBruk en mobil enhet eller nettbrett, eller last ned rapporten og send manuelt.");
+  }
+}
+
+function downloadFile(blob, filename){
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  a.click();
+  URL.revokeObjectURL(url);
 }
 
 init();

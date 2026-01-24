@@ -1,0 +1,366 @@
+/* =========================
+   KLP-profilert rapportlayout
+   
+   Farger fra KLP merkevaremanual:
+   - Granittgrå: #3D3D3D (overskrifter)
+   - Lys granittgrå: #F0F0F0 (flater)
+   - Lys fjellgrønn: #CDFAE2 (highlight)
+   - Lys morgenrød: #FFE1E1 (highlight)
+   
+   Typografi:
+   - Georgia (Lyon fallback) for overskrifter/brødtekst
+   - Arial (Calibre fallback) for metadata/tabeller
+========================= */
+
+/* A4-vennlig layout */
+@page {
+  size: A4 portrait;
+  margin: 16mm;
+}
+
+body {
+  margin: 0;
+  padding: 0;
+  font-family: Georgia, 'Times New Roman', serif;
+  font-size: 11pt;
+  line-height: 1.4;
+  color: #111;
+  background: #fff;
+}
+
+/* Hovedwrapper for rapport */
+.report {
+  max-width: 21cm;
+  margin: 0 auto;
+  padding: 0;
+  background: #fff;
+  font-family: Georgia, "Times New Roman", serif;
+  color: #111;
+}
+
+/* Header / Faktaboks */
+.report__header {
+  border: 1px solid #ddd;
+  border-left: 6px solid #3D3D3D;
+  padding: 4mm 5mm;
+  margin: 0 0 6mm;
+}
+
+.report__header h1 {
+  font-family: Georgia, serif;
+  font-size: 20pt;
+  font-weight: 700;
+  color: #3D3D3D;
+  margin: 0 0 6mm 0;
+  line-height: 1.3;
+}
+
+.report__meta {
+  font-family: Arial, 'Helvetica Neue', sans-serif;
+  font-size: 10.5pt;
+  line-height: 1.4;
+  color: #3D3D3D;
+  margin: 0 0 3mm;
+}
+
+.report__meta strong {
+  font-weight: 700;
+  color: #3D3D3D;
+}
+
+.report__attendees {
+  margin-top: 16px;
+}
+
+.report__attendees h3 {
+  font-family: Georgia, serif;
+  font-size: 12pt;
+  font-weight: 700;
+  color: #3D3D3D;
+  margin: 0 0 8px 0;
+}
+
+.report__attendees ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.report__attendees li {
+  font-family: Arial, sans-serif;
+  font-size: 10pt;
+  padding: 4px 0;
+  color: #3D3D3D;
+}
+
+/* Hovedoverskrifter (H2) - Seksjoner */
+.report h2 {
+  font-family: Georgia, serif;
+  font-size: 14pt;
+  font-weight: 700;
+  color: #3D3D3D;
+  margin: 10mm 0 3mm 0;
+  padding-bottom: 2mm;
+  border-bottom: 2px solid #3D3D3D;
+  break-after: avoid-page;
+  page-break-after: avoid;
+}
+
+/* Underoverskrifter (H3) - Bygg */
+.report h3 {
+  font-family: Georgia, serif;
+  font-size: 12pt;
+  font-weight: 700;
+  color: #3D3D3D;
+  margin: 6mm 0 2mm 0;
+  background: #CDFAE2;
+  padding: 2mm 3mm;
+  border-radius: 2mm;
+  break-after: avoid-page;
+  page-break-after: avoid;
+}
+
+/* Mindre overskrifter (H4) - Bildetekster */
+.report h4 {
+  font-family: Arial, sans-serif;
+  font-size: 10pt;
+  font-weight: 700;
+  color: #3D3D3D;
+  margin: 16px 0 8px 0;
+}
+
+/* Brødtekst */
+.report p {
+  font-family: Georgia, serif;
+  font-size: 11pt;
+  line-height: 1.4;
+  margin: 0 0 3mm 0;
+  text-align: left;
+  color: #111;
+}
+
+/* Lister */
+.report ul,
+.report ol {
+  margin: 3mm 0;
+  padding-left: 6mm;
+  font-family: Georgia, serif;
+  font-size: 11pt;
+  line-height: 1.4;
+}
+
+.report li {
+  margin-bottom: 2mm;
+  color: #111;
+}
+
+/* Objektliste (uthevet) */
+.report__objects {
+  background: #F0F0F0;
+  padding: 4mm 5mm;
+  border-left: 4px solid #CDFAE2;
+  border-radius: 2mm;
+  margin: 4mm 0;
+}
+
+.report__objects ul {
+  margin: 0;
+}
+
+/* Infobokser (fast tekst) */
+.report__infobox {
+  background: #FFE1E1;
+  border-left: 6px solid #3D3D3D;
+  padding: 4mm 5mm;
+  margin: 4mm 0;
+  border-radius: 2mm;
+}
+
+.report__infobox p {
+  margin: 0 0 2mm 0;
+  font-size: 10.5pt;
+  font-style: italic;
+  color: #555;
+}
+
+.report__infobox p:last-child {
+  margin-bottom: 0;
+}
+
+/* Metadata tabeller (bygningsinformasjon) */
+.report__building-meta {
+  font-family: Arial, sans-serif;
+  font-size: 10pt;
+  line-height: 1.4;
+  margin: 3mm 0;
+}
+
+.report__building-meta p {
+  font-family: Arial, sans-serif;
+  font-size: 10pt;
+  margin: 2mm 0;
+}
+
+/* Avvik og anbefalinger lister */
+.report__findings ol {
+  counter-reset: item;
+  list-style-type: none;
+  padding-left: 0;
+}
+
+.report__findings li {
+  counter-increment: item;
+  margin-bottom: 4mm;
+  padding-left: 0;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.report__findings li::before {
+  content: counter(item) ". ";
+  font-weight: 700;
+  color: #3D3D3D;
+  font-family: Arial, sans-serif;
+}
+
+/* Avoid-break wrapper for avvik/anbefalinger */
+.avoid-break {
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+/* Page break - tvunget sideskift */
+.page-break {
+  break-before: page;
+  page-break-before: always;
+}
+
+.report__finding-title {
+  font-weight: 700;
+  color: #3D3D3D;
+  font-family: Georgia, serif;
+  font-size: 11pt;
+}
+
+.report__finding-building {
+  font-family: Arial, sans-serif;
+  font-size: 9pt;
+  color: #666;
+  font-style: italic;
+}
+
+/* Bilder - maks 10cm høyde */
+.report figure {
+  margin: 0 0 6mm;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.report img,
+.report__image {
+  display: block;
+  max-width: 100%;
+  max-height: 10cm;
+  height: auto;
+  object-fit: contain;
+  border: 1px solid #e6e6e6;
+  border-radius: 4mm;
+  margin: 4mm 0 2mm 0;
+  break-inside: avoid;
+  page-break-inside: avoid;
+}
+
+.report figcaption,
+.report__image-caption {
+  font-family: Arial, sans-serif;
+  font-size: 9.5pt;
+  color: #444;
+  font-style: italic;
+  margin: 2mm 0 4mm 0;
+}
+
+/* Seksjoner - unngå sideskift midt i */
+.report section {
+  break-inside: avoid;
+  page-break-inside: avoid;
+  margin-bottom: 8mm;
+}
+
+/* Strong (uthevet tekst) */
+.report strong {
+  font-weight: 700;
+  color: #3D3D3D;
+}
+
+/* Print-spesifikk tilpasning */
+@media print {
+  * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+  
+  html, body {
+    background: #fff !important;
+  }
+  
+  body {
+    background: #fff;
+  }
+  
+  .report {
+    max-width: 100%;
+    padding: 0;
+  }
+  
+  img {
+    max-width: 100% !important;
+    height: auto !important;
+  }
+  
+  .no-print {
+    display: none !important;
+  }
+  
+  .avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  
+  .report h2,
+  .report h3,
+  .report h4 {
+    break-after: avoid-page;
+    page-break-after: avoid;
+  }
+  
+  .report section {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+  
+  .report figure,
+  .report__image {
+    break-inside: avoid;
+    page-break-inside: avoid;
+    break-after: auto;
+    page-break-after: auto;
+  }
+  
+  /* Unngå farger som ikke printer godt */
+  .report__infobox {
+    background: #f9f9f9;
+    border-left: 3px solid #000;
+  }
+  
+  .report h3 {
+    background: #f0f0f0;
+  }
+}
+
+/* Skjermvisning - litt ekstra luft */
+@media screen {
+  .report {
+    box-shadow: 0 0 20px rgba(0, 0, 0, 0.1);
+    margin: 20px auto;
+  }
+}
