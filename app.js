@@ -328,6 +328,11 @@ function showStep(step){
   $("btnGoLocations").style.display = inFlow ? "inline-block" : "none";
   $("btnGoFindings").style.display = inFlow ? "inline-block" : "none";
 
+  // Show export buttons on findings step
+  $("btnExportPDF").style.display = (step === "findings") ? "inline-block" : "none";
+  $("btnExportEmail").style.display = (step === "findings") ? "inline-block" : "none";
+  $("btnExportWord").style.display = (step === "findings") ? "inline-block" : "none";
+
   if(step === "locations"){
     renderActiveLocationFields();
     renderFindingLocationSelect(); // keep in sync
