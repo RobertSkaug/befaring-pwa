@@ -201,6 +201,22 @@ body {
   margin: 2mm 0;
 }
 
+.report__biz-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(70mm, 1fr));
+  gap: 5mm;
+  margin: 3mm 0;
+}
+
+.report__biz-grid p {
+  margin: 0 0 2mm 0;
+}
+
+.report__biz-grid ul {
+  margin: 0;
+  padding-left: 5mm;
+}
+
 /* Avvik og anbefalinger lister */
 .report__findings ol {
   counter-reset: item;

@@ -13,6 +13,9 @@
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 
   <link rel="stylesheet" href="./styles.css">
+  
+  <!-- Fabric.js for canvas annotations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
 </head>
 <body>
 <header class="header">
@@ -289,8 +292,14 @@
     <label>Beskrivelse</label>
     <textarea id="findingDesc" placeholder="Hva er observert? Hva anbefales?"></textarea>
 
-    <label>Bilder</label>
+    <label>Bilder (valgfritt - eller bruk "Legg til bilder med annotasjon")</label>
     <input id="findingPhotos" type="file" accept="image/*" capture="environment" multiple>
+
+    <div class="inline" style="margin-top: 12px;">
+      <button class="btn primary" id="btnAddImageAnnotations">📷 Legg til bilder med annotasjon</button>
+    </div>
+
+    <div id="imageThumbnails"></div>
 
     <div class="inline">
       <button class="btn" id="btnAiSuggest" style="display:none;">🤖 Foreslå tekst fra bilde (AI)</button>
@@ -333,6 +342,10 @@
 
 </main>
 
+<script src="./imageStore.js"></script>
+<script src="./imageAnnotator.js"></script>
+<script src="./imageCaptureFlow.js"></script>
+<script src="./thumbnailGrid.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>

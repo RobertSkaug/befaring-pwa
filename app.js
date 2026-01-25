@@ -346,6 +346,12 @@ function init(){
   $("findingPhotos").addEventListener("change", onFindingPhotosSelected);
   $("btnAddFinding").addEventListener("click", addFinding);
   $("btnAiSuggest").addEventListener("click", suggestFromImage);
+  
+  // Image annotations
+  if (window.ImageStore) {
+    window.ImageStore.initImageDB();
+  }
+  $("btnAddImageAnnotations").addEventListener("click", startImageCapture);
 
   renderAttendees();
   updateCustomerHeading();
@@ -1128,6 +1134,51 @@ function buildRefNo(locationId){
   return `L${locIdx}-${seq}-${mm}${yy}`;
 }
 
+// Image Capture for Findings
+let currentFindingImageAssets = [];
+
+async function startImageCapture(){
+  const locs = state.locations || [];
+  if(!locs.length){ 
+    alert("Legg til minst én lokasjon først."); 
+    return; 
+  }
+
+  let composite = $("findingLocation").value;
+  if(state.locations.length > 1 && !composite){
+    alert("Velg hvilket bygg dette gjelder.");
+    return;
+  }
+  if(!composite){
+    composite = `${state.activeLocationId}|${getActiveLocation().activeBuildingId}`;
+  }
+  const [locationId, buildingId] = composite.split("|");
+
+  // Generate temporary finding ID for image association
+  const tempFindingId = `TEMP-F-${Date.now()}`;
+
+  const flow = new window.ImageCaptureFlow(
+    tempFindingId,
+    "finding",
+    async (imageIds) => {
+      // Store image IDs for later association
+      currentFindingImageAssets = imageIds;
+      
+      // Render thumbnail grid
+      const grid = new window.ThumbnailGrid(
+        "imageThumbnails",
+        tempFindingId,
+        "finding"
+      );
+      await grid.render();
+      
+      alert(`${imageIds.length} bilde(r) lagt til. Fortsett å fylle ut avviket og trykk "Legg til".`);
+    }
+  );
+
+  await flow.start();
+}
+
 async function addFinding(){
   const locs = state.locations || [];
   if(!locs.length){ alert("Legg til minst én lokasjon først."); return; }
@@ -1185,8 +1236,20 @@ async function addFinding(){
     dueDate: type==="AVVIK" ? dueDate : "",
     title,
     desc,
-    photos
+    photos,
+    imageAssets: currentFindingImageAssets || []
   };
+
+  // If we have image assets with temporary ID, update them to the real finding ID
+  if (currentFindingImageAssets && currentFindingImageAssets.length > 0) {
+    for (const imageId of currentFindingImageAssets) {
+      const img = await window.ImageStore.getImage(imageId);
+      if (img) {
+        img.parentId = finding.id;
+        await window.ImageStore.saveImage(img);
+      }
+    }
+  }
 
   state.findings.push(finding);
 
@@ -1197,6 +1260,8 @@ async function addFinding(){
   $("findingDue").value = "";
   $("findingType").value = "AVVIK";
   $("findingSeverity").value = "Middels";
+  currentFindingImageAssets = [];
+  $("imageThumbnails").innerHTML = "";
   updateFindingFormVisibility();
 
   renderFindingsList();
@@ -1232,7 +1297,11 @@ function renderFindingsList(){
           <div class="thumbs">
             ${f.photos.map(p => `<img class="thumb" src="${esc(p.reportDataUrl || p.dataUrl)}" alt="">`).join("")}
           </div>
-        ` : `<div class="muted" style="margin-top:6px;">Ingen bilder</div>`}
+        ` : ""}
+        ${(f.imageAssets && f.imageAssets.length) ? `
+          <div id="findingImages-${esc(f.id)}" style="margin-top:10px;"></div>
+        ` : ""}
+        ${(!f.photos || !f.photos.length) && (!f.imageAssets || !f.imageAssets.length) ? `<div class="muted" style="margin-top:6px;">Ingen bilder</div>` : ""}
         <div class="inline" style="margin-top:10px;">
           <button class="btn danger" data-del-f="${esc(f.id)}">Slett</button>
         </div>
@@ -1251,6 +1320,18 @@ function renderFindingsList(){
       state.findings = state.findings.filter(x => x.id !== id);
       renderFindingsList();
     });
+  });
+  
+  // Render thumbnail grids for findings with annotated images
+  state.findings.forEach(async (f) => {
+    if (f.imageAssets && f.imageAssets.length > 0) {
+      const grid = new window.ThumbnailGrid(
+        `findingImages-${f.id}`,
+        f.id,
+        "finding"
+      );
+      await grid.render();
+    }
   });
 }
 
@@ -1353,21 +1434,32 @@ function buildReportHtml(){
         businessHtml = "<p>—</p>\n";
       }
       
-      // Areal: totalareal + fordeling per virksomhet
-      let areaHtml = "";
-      if (bld.areaM2) {
-        areaHtml = `<p><strong>Totalareal:</strong> ${esc(bld.areaM2)} m²</p>\n`;
-        
-        if (bld.areaBreakdown && Object.keys(bld.areaBreakdown).length > 0){
-          areaHtml += "<p><strong>Fordeling per virksomhet:</strong></p>\n<ul>\n";
-          Object.entries(bld.areaBreakdown).forEach(([k, v]) => {
-            areaHtml += `  <li>${esc(k)}: ${esc(v)} m²</li>\n`;
-          });
-          areaHtml += "</ul>\n";
-        }
+      // Areal
+      const totalArea = bld.areaM2 ? `${esc(bld.areaM2)} m²` : "—";
+
+      let breakdownHtml = "";
+      if (bld.areaBreakdown && Object.keys(bld.areaBreakdown).length > 0){
+        breakdownHtml = "<ul>\n";
+        Object.entries(bld.areaBreakdown).forEach(([k, v]) => {
+          breakdownHtml += `  <li>${esc(k)}: ${esc(v)} m²</li>\n`;
+        });
+        breakdownHtml += "</ul>\n";
       } else {
-        areaHtml = "<p><strong>Areal:</strong> —</p>\n";
+        breakdownHtml = "<p>—</p>\n";
       }
+
+      const bizAreaHtml = `
+<div class="report__biz-grid">
+  <div>
+    <p><strong>Virksomhet i bygg:</strong></p>
+    ${businessHtml}
+  </div>
+  <div>
+    <p><strong>Fordeling per virksomhet:</strong></p>
+    ${breakdownHtml}
+  </div>
+</div>
+`;
       
       // Byggeår, etasjer, konstruksjon
       const buildYear = bld.buildYear ? esc(bld.buildYear) : "—";
@@ -2088,21 +2180,32 @@ function buildReportContent() {
         businessHtml = "<p>—</p>\n";
       }
       
-      // Areal: totalareal + fordeling per virksomhet
-      let areaHtml = "";
-      if (bld.areaM2) {
-        areaHtml = `<p><strong>Totalareal:</strong> ${esc(bld.areaM2)} m²</p>\n`;
-        
-        if (bld.areaBreakdown && Object.keys(bld.areaBreakdown).length > 0){
-          areaHtml += "<p><strong>Fordeling per virksomhet:</strong></p>\n<ul>\n";
-          Object.entries(bld.areaBreakdown).forEach(([k, v]) => {
-            areaHtml += `  <li>${esc(k)}: ${esc(v)} m²</li>\n`;
-          });
-          areaHtml += "</ul>\n";
-        }
+      // Areal
+      const totalArea = bld.areaM2 ? `${esc(bld.areaM2)} m²` : "—";
+
+      let breakdownHtml = "";
+      if (bld.areaBreakdown && Object.keys(bld.areaBreakdown).length > 0){
+        breakdownHtml = "<ul>\n";
+        Object.entries(bld.areaBreakdown).forEach(([k, v]) => {
+          breakdownHtml += `  <li>${esc(k)}: ${esc(v)} m²</li>\n`;
+        });
+        breakdownHtml += "</ul>\n";
       } else {
-        areaHtml = "<p><strong>Areal:</strong> —</p>\n";
+        breakdownHtml = "<p>—</p>\n";
       }
+
+      const bizAreaHtml = `
+<div class="report__biz-grid">
+  <div>
+    <p><strong>Virksomhet i bygg:</strong></p>
+    ${businessHtml}
+  </div>
+  <div>
+    <p><strong>Fordeling per virksomhet:</strong></p>
+    ${breakdownHtml}
+  </div>
+</div>
+`;
       
       // Byggeår, etasjer, konstruksjon
       const buildYear = bld.buildYear ? esc(bld.buildYear) : "—";
@@ -2145,11 +2248,9 @@ function buildReportContent() {
 <h3>${label}</h3>
 <p><strong>Adresse:</strong> ${addr}</p>
 <p><strong>Bygningsnummer:</strong> ${buildingNo}</p>
+<p><strong>Totalareal:</strong> ${totalArea}</p>
 
-<p><strong>Virksomhet i bygg:</strong></p>
-${businessHtml}
-
-${areaHtml}
+${bizAreaHtml}
 
 <p><strong>Byggeår:</strong> ${buildYear}</p>
 <p><strong>Antall etasjer:</strong> ${floors}</p>
