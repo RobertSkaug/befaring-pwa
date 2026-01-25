@@ -1983,7 +1983,7 @@ body {
     <h3>Deltakere fra KLP:</h3>
     <ul>${klpList || "<li><em>Ingen registrert</em></li>"}</ul>
     
-    <h3>Deltakere fra kunde:</h3>
+    <h3>Deltakere fra ${customerName || "kunde"}:</h3>
     <ul>${customerList || "<li><em>Ingen registrert</em></li>"}</ul>
   </div>
 </div>
@@ -2392,7 +2392,7 @@ ${protectionHtml}
     <h3>Deltakere fra KLP:</h3>
     <ul>${klpList || "<li><em>Ingen registrert</em></li>"}</ul>
     
-    <h3>Deltakere fra kunde:</h3>
+    <h3>Deltakere fra ${customerName || "kunde"}:</h3>
     <ul>${customerList || "<li><em>Ingen registrert</em></li>"}</ul>
   </div>
 </div>
