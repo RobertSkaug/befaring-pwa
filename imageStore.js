@@ -154,14 +154,14 @@ async function updateImageAnnotations(id, annotatedDataURL, annotationJson) {
 
 // Export functions
 window.ImageStore = {
-  init: initImageDB,
+  initImageDB: initImageDB,
   generateId: generateImageId,
-  save: saveImageAsset,
-  get: getImageAsset,
-  getByParent: getImagesByParent,
-  delete: deleteImageAsset,
-  create: createImageAsset,
-  updateAnnotations: updateImageAnnotations,
+  saveImage: saveImageAsset,
+  getImage: getImageAsset,
+  getImagesByParent: getImagesByParent,
+  deleteImage: deleteImageAsset,
+  createImageAsset: createImageAsset,
+  updateImageAnnotations: updateImageAnnotations,
   blobToDataURL,
   dataURLToBlob
 };
