@@ -29,6 +29,7 @@
       <button class="btn" id="btnBackToLanding" style="display:none;">Til start</button>
       <button class="btn" id="btnGoLocations" style="display:none;">Lokasjoner</button>
       <button class="btn" id="btnGoFindings" style="display:none;">Avvik/Anbefaling</button>
+      <button class="btn" id="btnGoReport" style="display:none;">📄 Rapport</button>
     </div>
   </div>
 </header>
@@ -123,12 +124,12 @@
 
     <div class="row">
       <div>
-        <label>Objektnavn (valgfritt)</label>
-        <input id="objectName" placeholder="F.eks. Bygg A / Lager / Skolebygg" />
-      </div>
-      <div>
         <label>Adresse (velg fra forslag)</label>
         <input id="address" placeholder="Adresse" />
+      </div>
+      <div>
+        <label>Objektnavn (valgfritt)</label>
+        <input id="objectName" placeholder="F.eks. Bygg A / Lager / Skolebygg" />
       </div>
     </div>
 
@@ -292,6 +293,14 @@
     <input id="findingPhotos" type="file" accept="image/*" capture="environment" multiple>
 
     <div class="inline">
+      <button class="btn" id="btnAiSuggest" style="display:none;">🤖 Foreslå tekst fra bilde (AI)</button>
+    </div>
+
+    <div id="aiSuggestStatus" style="display:none; margin-top:8px; padding:8px; background:#f0f0f0; border-radius:4px;">
+      <div class="muted" id="aiSuggestMessage"></div>
+    </div>
+
+    <div class="inline">
       <button class="btn primary" id="btnAddFinding">Legg til</button>
     </div>
 
@@ -299,17 +308,26 @@
 
     <hr style="margin:24px 0; border:none; border-top:1px solid #eee;">
 
-    <h2>Eksporter rapport</h2>
-    <p class="muted">Generer rapport som PDF eller Word-dokument. På mobil kan du dele direkte via e-post.</p>
-
-    <div class="inline">
-      <button class="btn" id="btnExportPDF">📄 Åpne som PDF</button>
-      <button class="btn primary" id="btnExportEmail">📧 Send på e-post</button>
-      <button class="btn" id="btnExportWord">📝 Last ned Word</button>
-    </div>
-
     <div class="footerActions">
       <button class="btn" id="btnBackToLocations">Tilbake: Lokasjoner</button>
+    </div>
+  </section>
+
+  <!-- TRINN 3: RAPPORT -->
+  <section class="card" id="stepReport" style="display:none;">
+    <div class="report-header">
+      <h1>Rapport</h1>
+      <div class="inline">
+        <button class="btn" id="btnExportPDF">📄 Åpne som PDF</button>
+        <button class="btn primary" id="btnExportEmail">📧 Send på e-post</button>
+        <button class="btn" id="btnExportWord">📝 Last ned Word</button>
+      </div>
+    </div>
+
+    <hr style="margin:20px 0; border:none; border-top:1px solid #ddd;">
+
+    <div id="reportPreview" class="report-preview">
+      <!-- Rapporten rendres her av JavaScript -->
     </div>
   </section>
 

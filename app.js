@@ -257,6 +257,7 @@ function init(){
 
   $("btnToFindings").addEventListener("click", () => showStep("findings"));
   $("btnBackToLocations").addEventListener("click", () => showStep("locations"));
+  $("btnGoReport").addEventListener("click", () => showStep("report"));
 
   // Eksport-knapper
   $("btnExportPDF").addEventListener("click", exportToPDF);
@@ -342,7 +343,9 @@ function init(){
 
   // Findings
   $("findingType").addEventListener("change", updateFindingFormVisibility);
+  $("findingPhotos").addEventListener("change", onFindingPhotosSelected);
   $("btnAddFinding").addEventListener("click", addFinding);
+  $("btnAiSuggest").addEventListener("click", suggestFromImage);
 
   renderAttendees();
   updateCustomerHeading();
@@ -357,16 +360,13 @@ function showStep(step){
   $("stepLanding").style.display = (step==="landing") ? "block" : "none";
   $("stepLocations").style.display = (step==="locations") ? "block" : "none";
   $("stepFindings").style.display = (step==="findings") ? "block" : "none";
+  $("stepReport").style.display = (step==="report") ? "block" : "none";
 
   const inFlow = (step !== "landing");
   $("btnBackToLanding").style.display = inFlow ? "inline-block" : "none";
   $("btnGoLocations").style.display = inFlow ? "inline-block" : "none";
   $("btnGoFindings").style.display = inFlow ? "inline-block" : "none";
-
-  // Show export buttons on findings step
-  $("btnExportPDF").style.display = (step === "findings") ? "inline-block" : "none";
-  $("btnExportEmail").style.display = (step === "findings") ? "inline-block" : "none";
-  $("btnExportWord").style.display = (step === "findings") ? "inline-block" : "none";
+  $("btnGoReport").style.display = inFlow ? "inline-block" : "none";
 
   if(step === "locations"){
     renderActiveLocationFields();
@@ -376,6 +376,9 @@ function showStep(step){
     renderFindingLocationSelect();
     updateFindingFormVisibility();
     renderFindingsList();
+  }
+  if(step === "report"){
+    renderReportPreview();
   }
 
   setTimeout(() => window.scrollTo({ top: 0, left: 0, behavior: "auto" }), 0);
@@ -2425,6 +2428,15 @@ ${protectionHtml}
 </article>`;
 }
 
+// Render rapport i preview-området
+function renderReportPreview() {
+  const reportHtml = buildReportContent();
+  const previewDiv = $("reportPreview");
+  if (previewDiv) {
+    previewDiv.innerHTML = reportHtml;
+  }
+}
+
 async function printReport(reportHtml) {
   // Fetch report.css som tekst (cache bust)
   const reportCss = await fetch("./report.css", { cache: "no-store" })
@@ -2541,6 +2553,70 @@ function downloadFile(blob, filename){
   a.download = filename;
   a.click();
   URL.revokeObjectURL(url);
+}
+
+// === AI FORSLAG FRA BILDE ===
+
+function onFindingPhotosSelected(){
+  const files = $("findingPhotos").files;
+  const btn = $("btnAiSuggest");
+  btn.style.display = files && files.length > 0 ? "block" : "none";
+}
+
+async function suggestFromImage(){
+  const files = $("findingPhotos").files;
+  if (!files || files.length === 0) {
+    alert("Velg minst ett bilde.");
+    return;
+  }
+
+  const file = files[0]; // Bruk første bildet
+  const btn = $("btnAiSuggest");
+  const statusDiv = $("aiSuggestStatus");
+  const msgDiv = $("aiSuggestMessage");
+
+  btn.disabled = true;
+  statusDiv.style.display = "block";
+  msgDiv.textContent = "Behandler bilde...";
+
+  try {
+    // Konverter til base64
+    const base64 = await readFileAsDataUrl(file);
+    
+    // Kall backend
+    const response = await fetch("/api/ai/avvik-forslag", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({
+        imageData: base64
+      })
+    });
+
+    if (!response.ok) {
+      const error = await response.text();
+      throw new Error(`Server error: ${response.status} - ${error}`);
+    }
+
+    const result = await response.json();
+
+    // Fyll inn forslag
+    if (result.titleSuggestion) {
+      $("findingTitle").value = result.titleSuggestion;
+    }
+    if (result.descriptionSuggestion) {
+      $("findingDesc").value = result.descriptionSuggestion;
+    }
+    if (result.severitySuggestion) {
+      $("findingSeverity").value = result.severitySuggestion;
+    }
+
+    msgDiv.textContent = `✓ AI-forslag fylt inn (Sikkerhet: ${(result.confidence * 100).toFixed(0)}%)`;
+  } catch (err) {
+    console.error("AI suggestion error:", err);
+    msgDiv.textContent = `✗ Feil: ${err.message}`;
+  } finally {
+    btn.disabled = false;
+  }
 }
 
 init();
