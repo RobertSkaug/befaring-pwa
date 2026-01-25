@@ -178,7 +178,7 @@ const KLP_TITLES = [
   "Porteføljeansvarlig",
   "Senior forvalter",
   "Forvalter",
-  "Undervwriter",
+  "Underwriter",
   "Skadeforebygger",
   "Senior skadeforebygger"
 ];
