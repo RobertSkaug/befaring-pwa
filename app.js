@@ -221,8 +221,8 @@ function newBuilding(id){
     areaBreakdown:{},
     floors:"",
     
-    // NYT: Konstruksjonsmaterialer per del
-    // Format: { partName: [{type:'material'|'protection', label:'...'}] }
+    // Konstruksjonsmaterialer per del (kun materialer)
+    // Format: { partName: [{type:'material', label:'...'}] }
     constructionMaterials: {
       soyler: [],      // Søyler
       bjelker: [],     // Bjelker
@@ -230,6 +230,9 @@ function newBuilding(id){
       tak: [],         // Tak
       yttervegg: []    // Yttervegg
     },
+
+    // Ny: Beskyttelse som egen seksjon (ikke knyttet til konstruksjon)
+    protectionMeasures: [], // [code]
     
     // LEGACY: Behold for bakoverkompatibilitet (migreres ved load)
     columns:[],
@@ -397,65 +400,64 @@ function init(){
 }
 
 /**
- * Migrering: Konverter gammel data (materials[], protection[], columns[], etc.) til ny constructionMaterials struktur
- * - Kjører idempotent: migrerer kun hvis nye felt er tomme og gamle har innhold
- * - Dedupiserer per del (type+label)
+ * Migrering: separer materialer (constructionMaterials) og beskyttelse (protectionMeasures)
+ * - Idempotent: dedupliserer og kan kjøres flere ganger
+ * - Flytter gamle protection-data til ny protectionMeasures, og fjerner beskyttelse fra konstruksjon
  */
 function migrateConstructionData(){
   state.locations.forEach(loc => {
     loc.buildings.forEach(b => {
-      // Sjekk om migrering er nødvendig
-      const hasMissingNew = !b.constructionMaterials || 
-        (b.constructionMaterials.soyler.length === 0 &&
-         b.constructionMaterials.bjelker.length === 0 &&
-         b.constructionMaterials.dekk.length === 0 &&
-         b.constructionMaterials.tak.length === 0 &&
-         b.constructionMaterials.yttervegg.length === 0);
-
-      const hasOldData = (b.materials && b.materials.length > 0) || 
-                         (b.protection && b.protection.length > 0);
-
-      if(!hasMissingNew || !hasOldData) return; // Ingen migrering nødvendig
-
-      // Initialiser hvis ikke eksisterer
+      // init nye strukturer
       if(!b.constructionMaterials){
-        b.constructionMaterials = {
-          soyler: [], bjelker: [], dekk: [], tak: [], yttervegg: []
-        };
+        b.constructionMaterials = { soyler: [], bjelker: [], dekk: [], tak: [], yttervegg: [] };
       }
+      if(!b.protectionMeasures) b.protectionMeasures = [];
 
-      // Standardmål: Yttervegg
-      const targetPart = "yttervegg";
-      const target = b.constructionMaterials[targetPart];
+      // Normaliser protectionMeasures til koder (ikke objekter)
+      b.protectionMeasures = (b.protectionMeasures || [])
+        .map(entry => typeof entry === 'string' ? entry : (entry?.code || entry?.label || ""))
+        .filter(Boolean);
 
-      // Migrer materials[] til new format
-      if(b.materials && b.materials.length > 0){
-        b.materials.forEach(code => {
-          const mat = MATERIALS.find(x => x.code === code);
-          if(mat){
-            const item = { type: 'material', label: mat.label, code };
-            // Dedupliser: sjekk om allerede finnes
-            if(!target.find(x => x.type === item.type && x.label === item.label)){
-              target.push(item);
-            }
+      const pushProtUnique = (arr, code) => {
+        if(code && !arr.includes(code)) arr.push(code);
+      };
+      const pushMatUnique = (arr, item) => {
+        if(!item) return;
+        const exists = arr.find(x => x.code === item.code && x.type === 'material');
+        if(!exists) arr.push(item);
+      };
+
+      // Flytt eventuelle protection items ut av constructionMaterials
+      Object.keys(b.constructionMaterials).forEach(partId => {
+        const arr = b.constructionMaterials[partId] || [];
+        const keep = [];
+        arr.forEach(item => {
+          if(item.type === 'protection'){
+            pushProtUnique(b.protectionMeasures, item.code || item.label);
+          } else {
+            // sørg for at type er 'material'
+            if(item.code || item.label) keep.push({ type: 'material', code: item.code, label: item.label });
           }
         });
-        console.log(`[Migrering] Materiale migrerert til ${targetPart}:`, b.materials);
+        b.constructionMaterials[partId] = keep;
+      });
+
+      // Migrer legacy materials -> constructionMaterials (yttervegg som default)
+      const needsMat = Object.values(b.constructionMaterials).every(a => (a||[]).length === 0);
+      if(needsMat && b.materials && b.materials.length > 0){
+        const target = b.constructionMaterials.yttervegg;
+        b.materials.forEach(code => {
+          const mat = MATERIALS.find(x => x.code === code);
+          if(mat) pushMatUnique(target, { type:'material', code, label: mat.label });
+        });
       }
 
-      // Migrer protection[] til new format
+      // Migrer legacy protection -> protectionMeasures
       if(b.protection && b.protection.length > 0){
         b.protection.forEach(code => {
           const prot = PROTECTION.find(x => x.code === code);
-          if(prot){
-            const item = { type: 'protection', label: prot.label, code };
-            // Dedupliser
-            if(!target.find(x => x.type === item.type && x.label === item.label)){
-              target.push(item);
-            }
-          }
+          if(prot) pushProtUnique(b.protectionMeasures, code);
         });
-        console.log(`[Migrering] Beskyttelse migrerert til ${targetPart}:`, b.protection);
       }
     });
   });
@@ -792,6 +794,7 @@ function renderActiveBuildingFields(){
   $("bRisk").value = b.risk || "";
 
   renderConstructionMaterials();
+  renderProtectionMeasures();
   renderBusinessSelected();
   renderAreaBreakdown();
 }
@@ -947,8 +950,7 @@ function updateAreaSumStatus(){
 }
 
 /**
- * Render konstruksjonsdeler med Material/Beskyttelse-valg
- * Ny struktur som erstatter old renderBuildingChips + renderConstructionChips
+ * Render konstruksjonsdeler med materialvalg (kompakt grid)
  */
 function renderConstructionMaterials(){
   const b = getActiveBuilding();
@@ -963,29 +965,31 @@ function renderConstructionMaterials(){
     { id: "yttervegg", label: "Yttervegg" }
   ];
 
-  let html = "";
+  let html = `<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px;">`;
   
   parts.forEach(part => {
     const items = b.constructionMaterials[part.id] || [];
     
-    let chipsHtml = items.map((item, idx) => {
-      const chipClass = item.type === 'material' ? 'construction-chip--material' : 'construction-chip--protection';
-      return `<span class="construction-chip ${chipClass}" data-part="${part.id}" data-idx="${idx}">
+    const chipsHtml = items.map((item, idx) => {
+      return `<span class="construction-chip construction-chip--material" data-part="${part.id}" data-idx="${idx}">
         ${esc(item.label)}
         <button class="remove-btn" type="button">×</button>
       </span>`;
     }).join(" ");
 
     html += `
-<div style="margin-bottom:16px;">
-  <label style="display:block; margin-bottom:8px;"><strong>${esc(part.label)}</strong></label>
-  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
-    ${chipsHtml || '<span class="muted" style="font-size:13px;">–</span>'}
+<div class="card" style="padding:12px;">
+  <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
+    <label style="margin:0; font-weight:600;">${esc(part.label)}</label>
+    <button class="btn btn--sm" type="button" data-add-to-part="${part.id}">+ Legg til</button>
   </div>
-  <button class="btn btn--sm" type="button" data-add-to-part="${part.id}">+ Legg til</button>
+  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
+    ${chipsHtml || '<span class="muted" style="font-size:13px;">Ingen materialer valgt</span>'}
+  </div>
 </div>`;
   });
 
+  html += `</div>`;
   container.innerHTML = html;
 
   // Event listeners for add-knapper
@@ -1014,25 +1018,33 @@ function renderConstructionMaterials(){
 }
 
 /**
- * Åpne picker modal for å velge Material/Beskyttelse for en konstruksjonsdel
+ * Åpne picker modal for å velge material for en konstruksjonsdel
  */
 function openConstructionPicker(partId){
   const b = getActiveBuilding();
+  b.constructionMaterials[partId] = b.constructionMaterials[partId] || [];
+
+  const partLabels = {
+    soyler: "Søyler",
+    bjelker: "Bjelker",
+    dekk: "Dekke",
+    tak: "Tak",
+    yttervegg: "Yttervegg"
+  };
+  const partLabel = partLabels[partId] || partId;
   
-  // Lag en modal med Material- og Beskyttelse-lister
+  // Lag en modal kun med Material-liste
   const pickerHtml = `
 <div class="modal-overlay" id="constructionPickerModal">
   <div class="modal large" style="max-width:600px;">
     <div class="modal-header">
-      <h2>Legg til Material/Beskyttelse</h2>
+      <h2>Legg til materiale</h2>
       <button class="btn-icon" id="closePicker">✕</button>
     </div>
     <div class="modal-body">
       <h4 style="margin-top:0; color:#0DB28A; font-weight:600;">Materialer</h4>
-      <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:20px;" id="materialPickerList"></div>
-      
-      <h4 style="color:#E51C66; font-weight:600;">Beskyttelse</h4>
-      <div style="display:flex; flex-wrap:wrap; gap:10px;" id="protectionPickerList"></div>
+      <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:4px;" id="materialPickerList"></div>
+      <p class="muted" style="font-size:13px; margin-top:4px;">Velg materialer for ${esc(partLabel)}.</p>
     </div>
   </div>
 </div>`;
@@ -1041,16 +1053,10 @@ function openConstructionPicker(partId){
   document.body.insertAdjacentHTML("beforeend", pickerHtml);
   const modal = $("constructionPickerModal");
   const matList = $("materialPickerList");
-  const protList = $("protectionPickerList");
 
   // Render Material-valg
   matList.innerHTML = MATERIALS.map(m => {
     return `<button class="btn btn--sm" style="background:var(--klp-lys-fjellgronn); border-color:var(--klp-fjellgronn); color:var(--klp-svart);" data-select-mat="${m.code}">${esc(m.label)}</button>`;
-  }).join("");
-
-  // Render Beskyttelse-valg
-  protList.innerHTML = PROTECTION.map(p => {
-    return `<button class="btn btn--sm" style="background:var(--klp-lys-morgenrod); border-color:var(--klp-morgenrod); color:var(--klp-svart);" data-select-prot="${p.code}">${esc(p.label)}</button>`;
   }).join("");
 
   // Close button
@@ -1064,21 +1070,101 @@ function openConstructionPicker(partId){
     btn.addEventListener("click", () => {
       const code = btn.getAttribute("data-select-mat");
       const item = MATERIALS.find(x => x.code === code);
-      b.constructionMaterials[partId].push({ type: 'material', label: item.label, code });
+      const exists = (b.constructionMaterials[partId] || []).some(x => x.code === code && x.type === 'material');
+      if(!exists) b.constructionMaterials[partId].push({ type: 'material', label: item.label, code });
       modal.remove();
       renderConstructionMaterials();
       saveBuild();
     });
   });
+}
 
-  // Protection selection
-  protList.querySelectorAll("[data-select-prot]").forEach(btn => {
+/**
+ * Render beskyttelsestiltak (egen seksjon)
+ */
+function renderProtectionMeasures(){
+  const b = getActiveBuilding();
+  const container = $("protectionChips");
+  if(!container) return;
+
+  b.protectionMeasures = b.protectionMeasures || [];
+
+  const chips = b.protectionMeasures.map((entry, idx) => {
+    const code = typeof entry === 'string' ? entry : (entry?.code || entry?.label || "");
+    const item = PROTECTION.find(p => p.code === code);
+    const label = item ? item.label : code;
+    return `<span class="construction-chip construction-chip--protection" data-prot-idx="${idx}">
+      ${esc(label)}
+      <button class="remove-btn" type="button">×</button>
+    </span>`;
+  }).join(" ");
+
+  container.innerHTML = `
+    <div style="display:flex; flex-wrap:wrap; gap:8px;">
+      ${chips || '<span class="muted" style="font-size:13px;">Ingen beskyttelse registrert</span>'}
+      <button class="btn btn--sm" type="button" id="addProtectionBtn">+ Legg til</button>
+    </div>
+  `;
+
+  const addBtn = $("addProtectionBtn");
+  if(addBtn){
+    addBtn.addEventListener("click", (e) => {
+      e.preventDefault();
+      openProtectionPicker();
+    });
+  }
+
+  container.querySelectorAll("[data-prot-idx]").forEach(chip => {
+    const removeBtn = chip.querySelector(".remove-btn");
+    if(removeBtn){
+      removeBtn.addEventListener("click", (e) => {
+        e.preventDefault();
+        const idx = Number(chip.getAttribute("data-prot-idx"));
+        b.protectionMeasures.splice(idx, 1);
+        renderProtectionMeasures();
+        saveBuild();
+      });
+    }
+  });
+}
+
+function openProtectionPicker(){
+  const b = getActiveBuilding();
+  b.protectionMeasures = b.protectionMeasures || [];
+
+  const pickerHtml = `
+<div class="modal-overlay" id="protectionPickerModal">
+  <div class="modal" style="max-width:520px;">
+    <div class="modal-header">
+      <h2>Legg til beskyttelse</h2>
+      <button class="btn-icon" id="closeProtectionPicker">✕</button>
+    </div>
+    <div class="modal-body">
+      <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:8px;" id="protectionPickerList"></div>
+    </div>
+  </div>
+</div>`;
+
+  document.body.insertAdjacentHTML("beforeend", pickerHtml);
+  const modal = $("protectionPickerModal");
+  const list = $("protectionPickerList");
+
+  list.innerHTML = PROTECTION.map(p => {
+    return `<button class="btn btn--sm" style="background:var(--klp-lys-morgenrod); border-color:var(--klp-morgenrod); color:var(--klp-svart);" data-select-prot="${p.code}">${esc(p.label)}</button>`;
+  }).join("");
+
+  $("closeProtectionPicker").addEventListener("click", () => modal.remove());
+  modal.addEventListener("click", (e) => {
+    if(e.target === modal) modal.remove();
+  });
+
+  list.querySelectorAll("[data-select-prot]").forEach(btn => {
     btn.addEventListener("click", () => {
       const code = btn.getAttribute("data-select-prot");
-      const item = PROTECTION.find(x => x.code === code);
-      b.constructionMaterials[partId].push({ type: 'protection', label: item.label, code });
+      const exists = b.protectionMeasures.includes(code);
+      if(!exists) b.protectionMeasures.push(code);
       modal.remove();
-      renderConstructionMaterials();
+      renderProtectionMeasures();
       saveBuild();
     });
   });
@@ -2315,22 +2401,22 @@ body {
 ========================= */
 
 /**
- * Generer HTML for Materialer/Beskyttelse per konstruksjonsdel
- * Leser fra building.constructionMaterials[] med fallback til gamle felter
+ * Generer HTML for materialer (per del) og beskyttelse (egen seksjon)
+ * Leser fra nye felter med fallback til gamle arrays
  */
 function renderConstructionMaterialsReport(bld) {
   let html = "";
   
-  // Sjekk om vi har nye constructionMaterials
-  const hasNew = bld.constructionMaterials && 
+  const hasNewMaterials = bld.constructionMaterials && 
     (bld.constructionMaterials.soyler.length > 0 ||
      bld.constructionMaterials.bjelker.length > 0 ||
      bld.constructionMaterials.dekk.length > 0 ||
      bld.constructionMaterials.tak.length > 0 ||
      bld.constructionMaterials.yttervegg.length > 0);
 
-  if (hasNew) {
-    // NYE: Les fra constructionMaterials per del
+  const hasNewProtection = bld.protectionMeasures && bld.protectionMeasures.length > 0;
+
+  if (hasNewMaterials || hasNewProtection) {
     const partLabels = {
       soyler: "Søyler",
       bjelker: "Bjelker",
@@ -2339,22 +2425,30 @@ function renderConstructionMaterialsReport(bld) {
       yttervegg: "Yttervegg"
     };
 
-    const parts = Object.keys(bld.constructionMaterials);
-    parts.forEach(partId => {
-      const items = bld.constructionMaterials[partId] || [];
-      if (items.length === 0) return; // Skip tom del
+    if (hasNewMaterials) {
+      const parts = Object.keys(bld.constructionMaterials);
+      parts.forEach(partId => {
+        const items = bld.constructionMaterials[partId] || [];
+        if (items.length === 0) return; // Skip tom del
 
-      const partLabel = partLabels[partId];
-      const materials = items.filter(i => i.type === 'material').map(i => i.label).sort();
-      const protections = items.filter(i => i.type === 'protection').map(i => i.label).sort();
+        const partLabel = partLabels[partId];
+        const materials = items.filter(i => i.type === 'material').map(i => i.label).sort();
 
-      if (materials.length > 0) {
-        html += `<p><strong>${esc(partLabel)} – Materialer:</strong> ${esc(materials.join(", "))}</p>\n`;
-      }
-      if (protections.length > 0) {
-        html += `<p><strong>${esc(partLabel)} – Beskyttelse:</strong> ${esc(protections.join(", "))}</p>\n`;
-      }
-    });
+        if (materials.length > 0) {
+          html += `<p><strong>${esc(partLabel)} – Materialer:</strong> ${esc(materials.join(", "))}</p>\n`;
+        }
+      });
+    }
+
+    if (hasNewProtection) {
+      const labels = bld.protectionMeasures.map(entry => {
+        const code = typeof entry === 'string' ? entry : (entry?.code || entry?.label);
+        if(!code) return null;
+        const p = PROTECTION.find(x => x.code === code);
+        return p ? p.label : code;
+      }).filter(Boolean).sort();
+      html += `<p><strong>Beskyttelse:</strong> ${esc(labels.join(", "))}</p>\n`;
+    }
   } else {
     // FALLBACK: Les fra gamle felter
     if (bld.materials && bld.materials.length > 0) {

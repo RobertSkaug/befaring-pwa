@@ -237,20 +237,30 @@
 
     <hr style="margin:16px 0; border:none; border-top:1px solid #eee;">
 
-    <h4>Konstruksjon – Materialer og Beskyttelse</h4>
+    <h4>Konstruksjon – Materialer</h4>
     
     <div class="report__infobox" style="margin-bottom:16px;">
       <p>
-        Valg av materialer og beskyttelse knyttes til konstruksjonsdeler.
-        <strong style="color:#0DB28A;">Grønn farge = Materialer</strong>,
-        <strong style="color:#E51C66;">rød farge = Beskyttelse</strong>.
+        Velg materialer per konstruksjonsdel. Grønn farge = materialer.
       </p>
     </div>
 
-    <!-- Konstruksjonsdeler med Materialer/Beskyttelse-valg -->
+    <!-- Konstruksjonsdeler med Material-valg -->
     <div id="constructionPartsContainer">
       <!-- Rendres dynamisk fra app.js -->
     </div>
+
+    <hr style="margin:16px 0; border:none; border-top:1px solid #eee;">
+
+    <h4>Beskyttelse</h4>
+    <div class="report__infobox" style="margin-bottom:16px;">
+      <p>
+        Registrer beskyttende tiltak (sprinkler, alarmer, barrierer m.m.). Rød farge = beskyttelse.
+      </p>
+    </div>
+    <div id="protectionChips" class="chips"></div>
+
+    <hr style="margin:16px 0; border:none; border-top:1px solid #eee;">
 
     <label>Bygningsbeskrivelse</label>
     <textarea id="bDesc"></textarea>
