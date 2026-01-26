@@ -20,7 +20,7 @@ class ImageCaptureFlow {
         <div class="modal">
           <div class="modal-header">
             <h2>📷 Legg til bilder</h2>
-            <button class="btn-icon" id="btnCloseCaptureModal">✕</button>
+            <button class="btn btn--icon" id="btnCloseCaptureModal">✕</button>
           </div>
           <div class="modal-body">
             <p>Ta bilde eller velg fra galleri</p>
@@ -31,10 +31,10 @@ class ImageCaptureFlow {
               capture="environment" 
               style="display:none"
             />
-            <button class="btn primary large" id="btnTakePhoto">
+            <button class="btn btn--primary btn--lg" id="btnTakePhoto">
               📸 Ta bilde
             </button>
-            <button class="btn large" id="btnSelectFromGallery">
+            <button class="btn btn--secondary btn--lg" id="btnSelectFromGallery">
               🖼️ Velg fra galleri
             </button>
           </div>
@@ -138,8 +138,8 @@ class ImageCaptureFlow {
             <p>Vil du legge til flere bilder?</p>
           </div>
           <div class="modal-footer">
-            <button class="btn" id="btnFinishCapture">Ferdig</button>
-            <button class="btn primary" id="btnAddMore">Legg til flere</button>
+            <button class="btn btn--tertiary" id="btnFinishCapture">Ferdig</button>
+            <button class="btn btn--primary" id="btnAddMore">Legg til flere</button>
           </div>
         </div>
       </div>

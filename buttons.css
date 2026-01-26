@@ -1,0 +1,354 @@
+/**
+ * KLP BUTTON SYSTEM
+ * Basert på KLP merkevaremanual
+ * Fokus: Universell utforming, moderne, konsistent
+ */
+
+/* ========================================
+   KLP FARGETOKENS
+   ======================================== */
+:root {
+  --klp-granittgra: #3D3D3D;
+  --klp-hvit: #FFFFFF;
+  --klp-lys-granittgra: #F0F0F0;
+  --klp-fjellgronn: #0DB28A;
+  --klp-morgenrod: #E51C66;
+  --klp-lys-fjellgronn: #CDFAE2;
+  --klp-lys-morgenrod: #FFE1E1;
+  --klp-svart: #000000;
+  
+  /* Knappespesifikke tokens */
+  --btn-radius: 10px;
+  --btn-transition: all 0.2s ease;
+  --btn-shadow-hover: 0 4px 12px rgba(0,0,0,0.12);
+  --btn-shadow-active: 0 2px 6px rgba(0,0,0,0.15);
+}
+
+/* ========================================
+   BASE BUTTON
+   ======================================== */
+.btn {
+  /* Layout */
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  
+  /* Sizing - MD (default) */
+  padding: 12px 20px;
+  min-height: 48px;
+  min-width: 120px;
+  
+  /* Typography */
+  font-family: system-ui, -apple-system, 'Segoe UI', Roboto, Arial, sans-serif;
+  font-size: 16px;
+  font-weight: 600;
+  line-height: 1.4;
+  letter-spacing: 0.02em;
+  text-align: center;
+  text-decoration: none;
+  white-space: nowrap;
+  
+  /* Appearance */
+  border: 2px solid transparent;
+  border-radius: var(--btn-radius);
+  background: transparent;
+  color: var(--klp-granittgra);
+  cursor: pointer;
+  transition: var(--btn-transition);
+  
+  /* Accessibility */
+  -webkit-tap-highlight-color: transparent;
+  user-select: none;
+}
+
+.btn:focus-visible {
+  outline: 3px solid var(--klp-fjellgronn);
+  outline-offset: 2px;
+}
+
+.btn:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+
+/* ========================================
+   PRIMARY - Hovedhandlinger
+   ======================================== */
+.btn--primary {
+  background: var(--klp-morgenrod);
+  border-color: var(--klp-morgenrod);
+  color: var(--klp-hvit);
+  box-shadow: 0 2px 8px rgba(229, 28, 102, 0.2);
+}
+
+.btn--primary:hover {
+  background: #c91756;
+  border-color: #c91756;
+  box-shadow: var(--btn-shadow-hover);
+  transform: translateY(-1px);
+}
+
+.btn--primary:active {
+  background: #b5124c;
+  border-color: #b5124c;
+  box-shadow: var(--btn-shadow-active);
+  transform: translateY(0);
+}
+
+/* ========================================
+   SECONDARY - Støttehandlinger (outline)
+   ======================================== */
+.btn--secondary {
+  background: transparent;
+  border-color: var(--klp-morgenrod);
+  color: var(--klp-morgenrod);
+}
+
+.btn--secondary:hover {
+  background: var(--klp-lys-morgenrod);
+  border-color: #c91756;
+  color: #b5124c;
+}
+
+.btn--secondary:active {
+  background: #ffd1dc;
+  transform: scale(0.98);
+}
+
+/* ========================================
+   TERTIARY - Minst fremtredende (ghost)
+   ======================================== */
+.btn--tertiary {
+  background: transparent;
+  border-color: transparent;
+  color: var(--klp-granittgra);
+  min-width: auto;
+  padding: 10px 16px;
+}
+
+.btn--tertiary:hover {
+  background: var(--klp-lys-granittgra);
+  color: var(--klp-svart);
+}
+
+.btn--tertiary:active {
+  background: #e0e0e0;
+}
+
+/* ========================================
+   DANGER - Destruktive handlinger
+   ======================================== */
+.btn--danger {
+  background: #dc3545;
+  border-color: #dc3545;
+  color: var(--klp-hvit);
+}
+
+.btn--danger:hover {
+  background: #c82333;
+  border-color: #c82333;
+  box-shadow: var(--btn-shadow-hover);
+  transform: translateY(-1px);
+}
+
+.btn--danger:active {
+  background: #bd2130;
+  border-color: #bd2130;
+  transform: translateY(0);
+}
+
+/* ========================================
+   ICON BUTTON - Kvadratisk for ikoner
+   ======================================== */
+.btn--icon {
+  min-width: 48px;
+  width: 48px;
+  height: 48px;
+  padding: 0;
+  border-radius: var(--btn-radius);
+  background: var(--klp-hvit);
+  border: 2px solid var(--klp-lys-granittgra);
+  color: var(--klp-granittgra);
+  font-size: 20px;
+}
+
+.btn--icon:hover {
+  background: var(--klp-lys-granittgra);
+  border-color: var(--klp-granittgra);
+}
+
+.btn--icon:active {
+  transform: scale(0.95);
+}
+
+/* Icon button small variant */
+.btn--icon-sm {
+  min-width: 36px;
+  width: 36px;
+  height: 36px;
+  font-size: 16px;
+}
+
+/* ========================================
+   SIZE VARIANTS
+   ======================================== */
+.btn--sm {
+  padding: 8px 16px;
+  min-height: 36px;
+  min-width: 100px;
+  font-size: 14px;
+}
+
+.btn--lg {
+  padding: 16px 28px;
+  min-height: 56px;
+  min-width: 140px;
+  font-size: 18px;
+}
+
+/* Full width button */
+.btn--block {
+  width: 100%;
+  display: flex;
+}
+
+/* ========================================
+   LOADING STATE
+   ======================================== */
+.btn--loading {
+  position: relative;
+  color: transparent;
+  pointer-events: none;
+}
+
+.btn--loading::after {
+  content: '';
+  position: absolute;
+  width: 18px;
+  height: 18px;
+  top: 50%;
+  left: 50%;
+  margin-left: -9px;
+  margin-top: -9px;
+  border: 3px solid currentColor;
+  border-radius: 50%;
+  border-right-color: transparent;
+  animation: btn-spinner 0.6s linear infinite;
+}
+
+@keyframes btn-spinner {
+  to { transform: rotate(360deg); }
+}
+
+/* ========================================
+   TOOL BUTTONS (for annotator/toolbar)
+   ======================================== */
+.tool-btn {
+  min-width: 44px;
+  min-height: 44px;
+  width: 44px;
+  height: 44px;
+  padding: 0;
+  border-radius: var(--btn-radius);
+  border: 2px solid var(--klp-lys-granittgra);
+  background: var(--klp-hvit);
+  color: var(--klp-granittgra);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  transition: var(--btn-transition);
+}
+
+.tool-btn:hover {
+  background: var(--klp-lys-granittgra);
+  border-color: var(--klp-granittgra);
+}
+
+.tool-btn.active {
+  background: var(--klp-morgenrod);
+  border-color: var(--klp-morgenrod);
+  color: var(--klp-hvit);
+}
+
+.tool-btn svg {
+  width: 20px;
+  height: 20px;
+  stroke: currentColor;
+  fill: none;
+}
+
+/* ========================================
+   RESPONSIVE ADJUSTMENTS
+   ======================================== */
+@media (max-width: 640px) {
+  .btn {
+    min-width: 100px;
+    padding: 10px 16px;
+    font-size: 15px;
+  }
+  
+  .btn--lg {
+    padding: 14px 24px;
+    min-height: 52px;
+    font-size: 17px;
+  }
+  
+  .btn--sm {
+    padding: 7px 14px;
+    min-height: 34px;
+    font-size: 14px;
+  }
+}
+
+/* ========================================
+   LEGACY COMPATIBILITY
+   Støtte for eksisterende klasser
+   ======================================== */
+.btn.primary {
+  background: var(--klp-morgenrod);
+  border-color: var(--klp-morgenrod);
+  color: var(--klp-hvit);
+}
+
+.btn.primary:hover {
+  background: #c91756;
+  border-color: #c91756;
+}
+
+.btn.secondary {
+  background: transparent;
+  border-color: var(--klp-morgenrod);
+  color: var(--klp-morgenrod);
+}
+
+.btn.secondary:hover {
+  background: var(--klp-lys-morgenrod);
+}
+
+.btn.tertiary {
+  background: transparent;
+  border-color: transparent;
+  color: var(--klp-granittgra);
+}
+
+.btn.tertiary:hover {
+  background: var(--klp-lys-granittgra);
+}
+
+.btn.danger {
+  background: #dc3545;
+  border-color: #dc3545;
+  color: var(--klp-hvit);
+}
+
+.btn.danger:hover {
+  background: #c82333;
+}
+
+.btn.large {
+  padding: 16px 28px;
+  min-height: 56px;
+}

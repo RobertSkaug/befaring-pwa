@@ -13,6 +13,7 @@
   <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./buttons.css">
   <link rel="stylesheet" href="./report.css">
   
   <!-- Fabric.js for canvas annotations -->
@@ -29,11 +30,11 @@
       </div>
     </div>
     <div class="actions">
-      <button class="btn" id="btnUpdateApp" style="display:none;">Oppdater app</button>
-      <button class="btn" id="btnBackToLanding" style="display:none;">Til start</button>
-      <button class="btn" id="btnGoLocations" style="display:none;">Lokasjoner</button>
-      <button class="btn" id="btnGoFindings" style="display:none;">Avvik/Anbefaling</button>
-      <button class="btn" id="btnGoReport" style="display:none;">📄 Rapport</button>
+      <button class="btn btn--tertiary" id="btnUpdateApp" style="display:none;">Oppdater app</button>
+      <button class="btn btn--tertiary" id="btnBackToLanding" style="display:none;">Til start</button>
+      <button class="btn btn--tertiary" id="btnGoLocations" style="display:none;">Lokasjoner</button>
+      <button class="btn btn--tertiary" id="btnGoFindings" style="display:none;">Avvik/Anbefaling</button>
+      <button class="btn btn--tertiary" id="btnGoReport" style="display:none;">📄 Rapport</button>
     </div>
   </div>
 </header>
@@ -62,7 +63,7 @@
     </div>
 
     <div class="inline">
-      <button class="btn" id="btnSearchBrreg">Søk</button>
+      <button class="btn btn--secondary" id="btnSearchBrreg">Søk</button>
       <span class="status" id="brregStatus">BRREG: klar</span>
     </div>
 
@@ -98,7 +99,7 @@
       <div class="subcard">
         <div class="subhead">
           <h3 style="margin:0;">KLP</h3>
-          <button class="btn" id="btnAddKlp">+ Legg til</button>
+          <button class="btn btn--secondary" id="btnAddKlp">+ Legg til</button>
         </div>
         <div id="klpAttendees"></div>
       </div>
@@ -106,14 +107,14 @@
       <div class="subcard">
         <div class="subhead">
           <h3 style="margin:0;" id="customerHeading">Kunde</h3>
-          <button class="btn" id="btnAddCustomerAtt">+ Legg til</button>
+          <button class="btn btn--secondary" id="btnAddCustomerAtt">+ Legg til</button>
         </div>
         <div id="customerAttendees"></div>
       </div>
     </div>
 
     <div class="footerActions">
-      <button class="btn primary" id="btnStartInspection">Start befaring</button>
+      <button class="btn btn--primary" id="btnStartInspection">Start befaring</button>
     </div>
   </section>
 
@@ -121,7 +122,7 @@
   <section class="card" id="stepLocations" style="display:none;">
     <div class="locHeader">
       <h2 style="margin:0;">Lokasjoner (flere objekter)</h2>
-      <button class="btn primary" id="btnAddLocation">+ Ny lokasjon</button>
+      <button class="btn btn--primary" id="btnAddLocation">+ Ny lokasjon</button>
     </div>
 
     <div id="locTabs" class="locTabs"></div>
@@ -138,7 +139,7 @@
     </div>
 
     <div class="inline">
-      <button class="btn" id="btnGPS">Hent GPS + foreslå adresser</button>
+      <button class="btn btn--secondary" id="btnGPS">Hent GPS + foreslå adresser</button>
       <span class="pill"><span class="dot green"></span><span id="gpsStatus">GPS: ikke hentet</span></span>
     </div>
 
@@ -152,7 +153,7 @@
 
     <div class="locHeader">
       <h3 style="margin:0;">Bygg på denne lokasjonen</h3>
-      <button class="btn primary" id="btnAddBuilding">+ Nytt bygg</button>
+      <button class="btn btn--primary" id="btnAddBuilding">+ Nytt bygg</button>
     </div>
 
     <div id="buildingTabs" class="locTabs"></div>
@@ -182,7 +183,7 @@
     </div>
 
     <div class="inline">
-      <button class="btn" id="btnSuggestBusiness">Foreslå virksomhet (offentlige kilder)</button>
+      <button class="btn btn--secondary" id="btnSuggestBusiness">Foreslå virksomhet (offentlige kilder)</button>
       <span class="muted" id="businessStatus"></span>
     </div>
 
@@ -249,7 +250,7 @@
     <textarea id="bRisk"></textarea>
 
     <div class="footerActions">
-      <button class="btn" id="btnToFindings">Registrer avvik/anbefaling</button>
+      <button class="btn btn--secondary" id="btnToFindings">Registrer avvik/anbefaling</button>
     </div>
   </section>
 
@@ -294,13 +295,13 @@
     <textarea id="findingDesc" placeholder="Hva er observert? Hva anbefales?"></textarea>
 
     <div class="inline" style="margin-top: 12px;">
-      <button class="btn primary" id="btnAddImageAnnotations">📷 Legg til bilder</button>
+      <button class="btn btn--primary" id="btnAddImageAnnotations">📷 Legg til bilder</button>
     </div>
 
     <div id="imageThumbnails"></div>
 
     <div class="inline">
-      <button class="btn" id="btnAiSuggest" style="display:none;">🤖 Foreslå tekst fra bilde (AI)</button>
+      <button class="btn btn--secondary" id="btnAiSuggest" style="display:none;">🤖 Foreslå tekst fra bilde (AI)</button>
     </div>
 
     <div id="aiSuggestStatus" style="display:none; margin-top:8px; padding:8px; background:#f0f0f0; border-radius:4px;">
@@ -308,7 +309,7 @@
     </div>
 
     <div class="inline">
-      <button class="btn primary" id="btnAddFinding">Lagre avvik anbefaling</button>
+      <button class="btn btn--primary" id="btnAddFinding">Lagre avvik anbefaling</button>
     </div>
 
     <div id="findingList"></div>
@@ -316,7 +317,7 @@
     <hr style="margin:24px 0; border:none; border-top:1px solid #eee;">
 
     <div class="footerActions">
-      <button class="btn" id="btnBackToLocations">Tilbake: Lokasjoner</button>
+      <button class="btn btn--tertiary" id="btnBackToLocations">Tilbake: Lokasjoner</button>
     </div>
   </section>
 
@@ -325,9 +326,9 @@
     <div class="report-header">
       <h1>Rapport</h1>
       <div class="inline">
-        <button class="btn" id="btnExportPDF">📄 Åpne som PDF</button>
-        <button class="btn primary" id="btnExportEmail">📧 Send på e-post</button>
-        <button class="btn" id="btnExportWord">📝 Last ned Word</button>
+        <button class="btn btn--secondary" id="btnExportPDF">📄 Åpne som PDF</button>
+        <button class="btn btn--primary" id="btnExportEmail">📧 Send på e-post</button>
+        <button class="btn btn--secondary" id="btnExportWord">📝 Last ned Word</button>
       </div>
     </div>
 

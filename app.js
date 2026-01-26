@@ -532,7 +532,7 @@ function renderAttList(containerId, arr, group){
         </select>
       </div>
       <div>
-        <button class="btn danger" data-att-del="${group}|${idx}">Slett</button>
+        <button class="btn btn--danger" data-att-del="${group}|${idx}">Slett</button>
       </div>
     </div>
   `).join("");
@@ -1280,7 +1280,7 @@ function renderFindingsList(){
           <div id="findingImages-${esc(f.id)}" style="margin-top:10px;"></div>
         ` : `<div class="muted" style="margin-top:6px;">Ingen bilder</div>`}
         <div class="inline" style="margin-top:10px;">
-          <button class="btn danger" data-del-f="${esc(f.id)}">Slett</button>
+          <button class="btn btn--danger" data-del-f="${esc(f.id)}">Slett</button>
         </div>
       </div>
     `).join("");

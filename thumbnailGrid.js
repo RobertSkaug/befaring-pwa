@@ -47,8 +47,8 @@ class ThumbnailGrid {
         <img src="${displayURL}" alt="Bilde" />
         <div class="thumbnail-badge ${badgeClass}">${badge}</div>
         <div class="thumbnail-actions">
-          <button class="btn-icon-small" data-action="edit" title="Rediger">✏️</button>
-          <button class="btn-icon-small" data-action="delete" title="Slett">🗑️</button>
+          <button class="btn btn--icon-sm" data-action="edit" title="Rediger">✏️</button>
+          <button class="btn btn--icon-sm" data-action="delete" title="Slett">🗑️</button>
         </div>
       </div>
     `;
@@ -134,15 +134,15 @@ class ThumbnailGrid {
         <div class="modal large">
           <div class="modal-header">
             <h2>Bildevisning</h2>
-            <button class="btn-icon" id="btnCloseImageView">✕</button>
+            <button class="btn btn--icon" id="btnCloseImageView">✕</button>
           </div>
           <div class="modal-body center">
             <img src="${displayURL}" style="max-width: 100%; max-height: 70vh;" />
             ${image.notes ? `<p class="image-notes">${image.notes}</p>` : ""}
           </div>
           <div class="modal-footer">
-            <button class="btn" id="btnEditFromView">✏️ Rediger</button>
-            <button class="btn danger" id="btnDeleteFromView">🗑️ Slett</button>
+            <button class="btn btn--secondary" id="btnEditFromView">✏️ Rediger</button>
+            <button class="btn btn--danger" id="btnDeleteFromView">🗑️ Slett</button>
           </div>
         </div>
       </div>

@@ -45,7 +45,7 @@ class ImageAnnotator {
         <div class="annotator-container">
           <div class="annotator-header">
             <h2>Annoter bilde</h2>
-            <button class="btn-icon" id="btnCloseAnnotator">✕</button>
+            <button class="btn btn--icon" id="btnCloseAnnotator">✕</button>
           </div>
           
           <div class="annotator-toolbar">
@@ -106,8 +106,8 @@ class ImageAnnotator {
           </div>
           
           <div class="annotator-footer">
-            <button class="btn" id="btnCancelAnnotation">Avbryt</button>
-            <button class="btn primary" id="btnSaveAnnotation">Lagre og fortsett</button>
+            <button class="btn btn--tertiary" id="btnCancelAnnotation">Avbryt</button>
+            <button class="btn btn--primary" id="btnSaveAnnotation">Lagre og fortsett</button>
           </div>
         </div>
       </div>
