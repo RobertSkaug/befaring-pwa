@@ -111,20 +111,20 @@ const digits = (s) => (s||"").replace(/\D+/g,"");
 const esc = (s) => String(s??"").replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
 const MATERIALS = [
-  { code:"B", label:"B – Betong" },
-  { code:"S", label:"S – Stål" },
-  { code:"T", label:"T – Tre" },
-  { code:"M", label:"M – Mur" },
-  { code:"U", label:"U – Ubrennbar isolasjon" },
-  { code:"C", label:"C – Brennbar isolasjon" }
+  { code:"B", label:"Betong" },
+  { code:"S", label:"Stål" },
+  { code:"T", label:"Tre" },
+  { code:"M", label:"Mur" },
+  { code:"U", label:"Ubrennbar isolasjon" },
+  { code:"C", label:"Brennbar isolasjon" }
 ];
 const PROTECTION = [
-  { code:"S", label:"S – Sprinkleranlegg" },
-  { code:"A", label:"A – Brannalarmanlegg" },
-  { code:"I", label:"I – Innbruddsalarmanlegg" },
-  { code:"G", label:"G – Gasslokkeanlegg" },
-  { code:"R", label:"R – Røykventilasjon" },
-  { code:"D", label:"D – Delvis beskyttelse" }
+  { code:"S", label:"Sprinkleranlegg" },
+  { code:"A", label:"Brannalarmanlegg" },
+  { code:"I", label:"Innbruddsalarmanlegg" },
+  { code:"G", label:"Gasslokkeanlegg" },
+  { code:"R", label:"Røykventilasjon" },
+  { code:"D", label:"Delvis beskyttelse" }
 ];
 
 const CONSTR_COL = [
@@ -504,7 +504,11 @@ function migrateConstructionData(){
             pushProtUnique(b.protectionMeasures, item.code || item.label);
           } else {
             // sørg for at type er 'material'
-            if(item.code || item.label) keep.push({ type: 'material', code: item.code, label: item.label });
+            if(item.code || item.label){
+              const mat = MATERIALS.find(x => x.code === item.code);
+              const cleanLabel = mat ? mat.label : (item.label || "");
+              keep.push({ type: 'material', code: item.code, label: cleanLabel });
+            }
           }
         });
         b.constructionMaterials[partId] = keep;
