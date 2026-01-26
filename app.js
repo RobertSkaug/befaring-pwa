@@ -380,6 +380,27 @@ function init(){
     window.ImageStore.initImageDB();
   }
   $("btnAddImageAnnotations").addEventListener("click", startImageCapture);
+  // Help icons for field guidance
+  const helpMap = {
+    btnHelpDesc: {
+      title: "Bygningsbeskrivelse",
+      text: "Her føres korte kommentarer til den skjematiske fremstilling av bygget i tabellen. For eksempel kan det beskrives litt nærmere om; isolasjons materialer, innvendige brannvegger, avstand til nabobygg, eller andre forhold som kan betydning for risikovurderingen av anlegget."
+    },
+    btnHelpSafety: {
+      title: "Sikkerhetsforhold",
+      text: "Her beskrives kort branntekniske eller andre risikoforhold som for eks.: Utplassering og merking av slukkeutstyr, avfallshåndtering, orden i rømningsveier, tilstanden til branndører, innbruddsikring osv. Er det lite å bemerke og man ikke finner det formålstjenlig å utstede liste med anbefalinger eller fotorapport kan befaringsrapporten avsluttes her og øvrige sider slettes."
+    },
+    btnHelpRisk: {
+      title: "Generell vurdering av risiko",
+      text: "Her beskrives den generelle vurderingen av risikoen, som ikke omfatter bygningsbeskrivelse eller sikkerhetsforhold. Forvaltning, drift og vedlikehold skal kommenteres spesifikt her."
+    }
+  };
+  Object.keys(helpMap).forEach(id => {
+    const el = $(id);
+    if(el){
+      el.addEventListener("click", () => openHelpModal(helpMap[id].title, helpMap[id].text));
+    }
+  });
 
   // Først: last tidligere lagret data hvis det finnes
   loadBuild();
@@ -397,6 +418,24 @@ function init(){
   renderFindingLocationSelect();
 
   showStep("landing");
+}
+function openHelpModal(title, text){
+  const html = `
+<div class="modal-overlay" id="helpModal">
+  <div class="modal" style="max-width:560px;">
+    <div class="modal-header">
+      <h2>${esc(title)}</h2>
+      <button class="btn-icon" id="closeHelpModal">✕</button>
+    </div>
+    <div class="modal-body">
+      <p>${esc(text)}</p>
+    </div>
+  </div>
+</div>`;
+  document.body.insertAdjacentHTML("beforeend", html);
+  const modal = $("helpModal");
+  $("closeHelpModal").addEventListener("click", () => modal.remove());
+  modal.addEventListener("click", (e) => { if(e.target === modal) modal.remove(); });
 }
 
 /**
