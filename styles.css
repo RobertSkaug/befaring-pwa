@@ -17,33 +17,29 @@ body{margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-s
 .t2{color:var(--mut); font-size:12px;}
 .actions{display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end}
 
-/* Scrollable topnav på mobil */
+/* Mobil: deaktiver sticky og bruk kollapsbar meny */
 @media (max-width: 640px) {
-  .actions {
-    flex-wrap: nowrap;
-    overflow-x: auto;
-    -webkit-overflow-scrolling: touch;
-    scrollbar-width: none; /* Firefox */
-    -ms-overflow-style: none; /* IE/Edge */
-  }
-  
-  .actions::-webkit-scrollbar {
-    display: none; /* Chrome/Safari */
-  }
-  
-  .actions .btn {
-    flex-shrink: 0;
-    white-space: nowrap;
-  }
+  .header { position: static; top: auto; z-index: 1; backdrop-filter: none; background: #fff; }
+  .actions { display: none; }
 }
 
 main{padding: 14px 0 34px;}
 
-/* Extra padding på mobil når sticky actionbar er aktiv */
+/* Mobil: normal padding (ingen sticky actionbar) */
 @media (max-width: 640px) {
-  main {
-    padding-bottom: 100px; /* Rom for sticky actionbar */
-  }
+  main { padding-bottom: 34px; }
+}
+
+/* Kollapsbar mobilmeny */
+.mobile-menu { display: none; margin: 0 0 12px; }
+.mobile-menu summary { list-style: none; cursor: pointer; font-weight: 700; display: flex; align-items: center; gap: 8px; }
+.mobile-menu summary::-webkit-details-marker { display: none; }
+.mobile-menu__panel { padding: 10px 0 0; }
+
+@media (max-width: 640px) {
+  .mobile-menu { display: block; }
+  .mobile-menu .btn-row { flex-direction: column; gap: 10px; }
+  .mobile-menu .btn { width: 100%; min-height: 48px; }
 }
 
 .card{background: rgba(255,255,255,.94); border:1px solid var(--b); border-radius: var(--r); box-shadow: var(--sh); padding: 14px; margin-top: 12px;}

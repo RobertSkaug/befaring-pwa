@@ -51,6 +51,13 @@ function setupUpdater(){
       await forceUpdateNow();
     });
   }
+
+  const mBtn = document.getElementById("mBtnUpdateApp");
+  if (mBtn){
+    mBtn.addEventListener("click", async () => {
+      await forceUpdateNow();
+    });
+  }
 }
 
 function showUpdateButton(show){
@@ -272,6 +279,12 @@ function init(){
   $("btnBackToLocations").addEventListener("click", () => showStep("locations"));
   $("btnGoReport").addEventListener("click", () => showStep("report"));
 
+    // Mobilmeny: same actions
+    $("mBtnBackToLanding").addEventListener("click", () => showStep("landing"));
+    $("mBtnGoLocations").addEventListener("click", () => showStep("locations"));
+    $("mBtnGoFindings").addEventListener("click", () => showStep("findings"));
+    $("mBtnGoReport").addEventListener("click", () => showStep("report"));
+
   // Eksport-knapper
   $("btnExportPDF").addEventListener("click", exportToPDF);
   $("btnExportEmail").addEventListener("click", exportAndEmail);
@@ -490,6 +503,18 @@ function showStep(step){
   $("btnGoLocations").style.display = inFlow ? "inline-block" : "none";
   $("btnGoFindings").style.display = inFlow ? "inline-block" : "none";
   $("btnGoReport").style.display = inFlow ? "inline-block" : "none";
+
+  // Mobil-meny speiler visningsstatus
+  const mobileIds = ["mBtnBackToLanding","mBtnGoLocations","mBtnGoFindings","mBtnGoReport","mBtnUpdateApp"];
+  mobileIds.forEach(id => {
+    const el = $(id);
+    if(!el) return;
+    if(id === "mBtnUpdateApp"){
+      el.style.display = hasUpdate ? "inline-flex" : "none";
+    } else {
+      el.style.display = inFlow ? "inline-flex" : "none";
+    }
+  });
 
   if(step === "locations"){
     renderActiveLocationFields();
