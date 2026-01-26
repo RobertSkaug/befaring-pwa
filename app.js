@@ -343,7 +343,6 @@ function init(){
 
   // Findings
   $("findingType").addEventListener("change", updateFindingFormVisibility);
-  $("findingPhotos").addEventListener("change", onFindingPhotosSelected);
   $("btnAddFinding").addEventListener("click", addFinding);
   $("btnAiSuggest").addEventListener("click", suggestFromImage);
   
@@ -1172,6 +1171,10 @@ async function startImageCapture(){
       );
       await grid.render();
       
+      // Show/hide AI suggest button based on images
+      const aiBtn = $("btnAiSuggest");
+      aiBtn.style.display = imageIds && imageIds.length > 0 ? "block" : "none";
+      
       alert(`${imageIds.length} bilde(r) lagt til. Fortsett å fylle ut avviket og trykk "Legg til".`);
     }
   );
@@ -1207,24 +1210,6 @@ async function addFinding(){
 
   if(!title){ alert("Tittel mangler."); return; }
 
-  const files = Array.from($("findingPhotos").files || []);
-  const photos = [];
-
-  for (const f of files) {
-    try {
-      // Prøv "rapportvennlig" (resized JPEG)
-      const reportDataUrl = await readAsDataUrlConstrained(f, 900, 550, 0.80);
-      // Prøv "full" (større)
-      const dataUrl = await readAsDataUrlConstrained(f, 1400, 1400, 0.80);
-
-      photos.push({ dataUrl, reportDataUrl, comment: "" });
-    } catch (e) {
-      // Fallback: hvis canvas/konvertering feiler, ta rå dataURL
-      const raw = await readFileAsDataUrl(f);
-      photos.push({ dataUrl: raw, reportDataUrl: raw, comment: "" });
-    }
-  }
-
   const finding = {
     id: `F-${Date.now()}`,
     locationId,
@@ -1236,7 +1221,6 @@ async function addFinding(){
     dueDate: type==="AVVIK" ? dueDate : "",
     title,
     desc,
-    photos,
     imageAssets: currentFindingImageAssets || []
   };
 
@@ -1256,7 +1240,6 @@ async function addFinding(){
   // Reset form
   $("findingTitle").value = "";
   $("findingDesc").value = "";
-  $("findingPhotos").value = "";
   $("findingDue").value = "";
   $("findingType").value = "AVVIK";
   $("findingSeverity").value = "Middels";
@@ -1293,15 +1276,9 @@ function renderFindingsList(){
         <div><strong>${esc(f.title)}</strong> <span class="muted">(${esc(f.type)})</span></div>
         <div class="muted">Objekt: ${esc(f.buildingHeading || locName(locId))} • Ref.nr: ${esc(f.refNo)} ${f.dueDate ? `• Frist: ${esc(f.dueDate)}` : ""}</div>
         ${f.desc ? `<div class="muted" style="margin-top:6px;">${esc(f.desc).replaceAll("\n","<br>")}</div>` : ""}
-        ${(f.photos && f.photos.length) ? `
-          <div class="thumbs">
-            ${f.photos.map(p => `<img class="thumb" src="${esc(p.reportDataUrl || p.dataUrl)}" alt="">`).join("")}
-          </div>
-        ` : ""}
         ${(f.imageAssets && f.imageAssets.length) ? `
           <div id="findingImages-${esc(f.id)}" style="margin-top:10px;"></div>
-        ` : ""}
-        ${(!f.photos || !f.photos.length) && (!f.imageAssets || !f.imageAssets.length) ? `<div class="muted" style="margin-top:6px;">Ingen bilder</div>` : ""}
+        ` : `<div class="muted" style="margin-top:6px;">Ingen bilder</div>`}
         <div class="inline" style="margin-top:10px;">
           <button class="btn danger" data-del-f="${esc(f.id)}">Slett</button>
         </div>
@@ -1347,41 +1324,11 @@ function readFileAsDataUrl(file){
   });
 }
 
-function readAsDataUrlConstrained(file, maxW = 1200, maxH = 1200, quality = 0.8){
-  return new Promise((resolve, reject) => {
-    const img = new Image();
-    const reader = new FileReader();
-
-    reader.onload = () => { img.src = reader.result; };
-    reader.onerror = () => reject(reader.error);
-
-    img.onload = () => {
-      const w = img.width;
-      const h = img.height;
-      const scale = Math.min(1, maxW / w, maxH / h);
-      const nw = Math.max(1, Math.round(w * scale));
-      const nh = Math.max(1, Math.round(h * scale));
-
-      const canvas = document.createElement("canvas");
-      canvas.width = nw;
-      canvas.height = nh;
-
-      const ctx = canvas.getContext("2d");
-      ctx.drawImage(img, 0, 0, nw, nh);
-
-      resolve(canvas.toDataURL("image/jpeg", quality));
-    };
-
-    img.onerror = () => reject(new Error("Kunne ikke lese bilde"));
-    reader.readAsDataURL(file);
-  });
-}
-
 /* =========================
    RAPPORTGENERERING
 ========================= */
 
-function buildReportHtml(){
+async function buildReportHtml(){
   const today = formatDateNo(state.inspectionDate);
   const customerName = esc(state.customer.name || "Ikke oppgitt");
   const orgnr = esc(state.customer.orgnr || "—");
@@ -1565,17 +1512,20 @@ ${protectionHtml}
     let dueDateText = "";
     if (f.dueDate) dueDateText = `<p style="margin-top: 12px;"><strong>Frist for utbedring:</strong> ${formatDateNo(f.dueDate)}</p>`;
     
-    // Bilder
+    // Bilder fra ImageStore
     let photosHtml = "";
-    if (f.photos && f.photos.length > 0) {
+    if (f.imageAssets && f.imageAssets.length > 0) {
       photosHtml = '<div style="margin-top: 12px;">';
-      f.photos.forEach(photo => {
-        const imgSrc = photo.reportDataUrl || photo.dataUrl;
-        photosHtml += `<img class="report__image" src="${imgSrc}" alt="Bilde for avvik 2.${num}" style="max-height: 8cm; margin: 8px 0;" />`;
-        if (photo.comment){
-          photosHtml += `<p class="report__image-caption">${esc(photo.comment)}</p>`;
+      for (const imageId of f.imageAssets) {
+        const img = await window.ImageStore.getImage(imageId);
+        if (img) {
+          const imgSrc = img.hasAnnotations ? img.annotatedDataURL : img.originalDataURL;
+          photosHtml += `<img class="report__image" src="${imgSrc}" alt="Bilde for avvik 2.${num}" style="max-height: 8cm; margin: 8px 0;" />`;
+          if (img.notes) {
+            photosHtml += `<p class="report__image-caption">${esc(img.notes)}</p>`;
+          }
         }
-      });
+      }
       photosHtml += '</div>';
     }
     
@@ -1607,17 +1557,20 @@ ${protectionHtml}
     let dueDateText = "";
     if (f.dueDate) dueDateText = `<p style="margin-top: 12px;"><strong>Frist for tilbakemelding:</strong> ${formatDateNo(f.dueDate)}</p>`;
     
-    // Bilder
+    // Bilder fra ImageStore
     let photosHtml = "";
-    if (f.photos && f.photos.length > 0) {
+    if (f.imageAssets && f.imageAssets.length > 0) {
       photosHtml = '<div style="margin-top: 12px;">';
-      f.photos.forEach(photo => {
-        const imgSrc = photo.reportDataUrl || photo.dataUrl;
-        photosHtml += `<img class="report__image" src="${imgSrc}" alt="Bilde for anbefaling 3.${num}" style="max-height: 8cm; margin: 8px 0;" />`;
-        if (photo.comment){
-          photosHtml += `<p class="report__image-caption">${esc(photo.comment)}</p>`;
+      for (const imageId of f.imageAssets) {
+        const img = await window.ImageStore.getImage(imageId);
+        if (img) {
+          const imgSrc = img.hasAnnotations ? img.annotatedDataURL : img.originalDataURL;
+          photosHtml += `<img class="report__image" src="${imgSrc}" alt="Bilde for anbefaling 3.${num}" style="max-height: 8cm; margin: 8px 0;" />`;
+          if (img.notes) {
+            photosHtml += `<p class="report__image-caption">${esc(img.notes)}</p>`;
+          }
         }
-      });
+      }
       photosHtml += '</div>';
     }
     
@@ -2127,7 +2080,7 @@ body {
 ========================= */
 
 // Bygg kun rapport-innhold (body HTML) - for print med ekstern CSS
-function buildReportContent() {
+async function buildReportContent() {
   const today = formatDateNo(state.inspectionDate);
   const customerName = esc(state.customer.name || "Ikke oppgitt");
   const orgnr = esc(state.customer.orgnr || "—");
@@ -2309,18 +2262,21 @@ ${protectionHtml}
     let dueDateText = "";
     if (f.dueDate) dueDateText = `<p style="margin-top: 3mm;"><strong>Frist for utbedring:</strong> ${formatDateNo(f.dueDate)}</p>`;
     
-    // Bilder
+    // Bilder fra ImageStore
     let photosHtml = "";
-    if (f.photos && f.photos.length > 0) {
+    if (f.imageAssets && f.imageAssets.length > 0) {
       photosHtml = '<div style="margin-top: 3mm;">';
-      f.photos.forEach(photo => {
-        const imgSrc = photo.reportDataUrl || photo.dataUrl;
-        photosHtml += `<figure class="avoid-break"><img class="report__image" src="${imgSrc}" alt="Bilde for avvik 2.${num}" />`;
-        if (photo.comment){
-          photosHtml += `<figcaption class="report__image-caption">${esc(photo.comment)}</figcaption>`;
+      for (const imageId of f.imageAssets) {
+        const img = await window.ImageStore.getImage(imageId);
+        if (img) {
+          const imgSrc = img.hasAnnotations ? img.annotatedDataURL : img.originalDataURL;
+          photosHtml += `<figure class="avoid-break"><img class="report__image" src="${imgSrc}" alt="Bilde for avvik 2.${num}" />`;
+          if (img.notes) {
+            photosHtml += `<figcaption class="report__image-caption">${esc(img.notes)}</figcaption>`;
+          }
+          photosHtml += `</figure>`;
         }
-        photosHtml += `</figure>`;
-      });
+      }
       photosHtml += '</div>';
     }
     
@@ -2354,16 +2310,19 @@ ${protectionHtml}
     
     // Bilder
     let photosHtml = "";
-    if (f.photos && f.photos.length > 0) {
+    if (f.imageAssets && f.imageAssets.length > 0) {
       photosHtml = '<div style="margin-top: 3mm;">';
-      f.photos.forEach(photo => {
-        const imgSrc = photo.reportDataUrl || photo.dataUrl;
-        photosHtml += `<figure class="avoid-break"><img class="report__image" src="${imgSrc}" alt="Bilde for anbefaling 3.${num}" />`;
-        if (photo.comment){
-          photosHtml += `<figcaption class="report__image-caption">${esc(photo.comment)}</figcaption>`;
+      for (const imageId of f.imageAssets) {
+        const img = await window.ImageStore.getImage(imageId);
+        if (img) {
+          const imgSrc = img.hasAnnotations ? img.annotatedDataURL : img.originalDataURL;
+          photosHtml += `<figure class="avoid-break"><img class="report__image" src="${imgSrc}" alt="Bilde for anbefaling 3.${num}" />`;
+          if (img.comment) {
+            photosHtml += `<figcaption class="report__image-caption">${esc(img.comment)}</figcaption>`;
+          }
+          photosHtml += `</figure>`;
         }
-        photosHtml += `</figure>`;
-      });
+      }
       photosHtml += '</div>';
     }
     
@@ -2530,8 +2489,8 @@ ${protectionHtml}
 }
 
 // Render rapport i preview-området
-function renderReportPreview() {
-  const reportHtml = buildReportContent();
+async function renderReportPreview() {
+  const reportHtml = await buildReportContent();
   const previewDiv = $("reportPreview");
   if (previewDiv) {
     previewDiv.innerHTML = reportHtml;
@@ -2576,12 +2535,12 @@ async function printReport(reportHtml) {
 }
 
 async function exportToPDF(){
-  const html = buildReportContent();
+  const html = await buildReportContent();
   await printReport(html);
 }
 
 async function exportToWord(){
-  const html = buildReportHtml();
+  const html = await buildReportHtml();
   
   const blob = new Blob([html], {
     type: "application/msword"
@@ -2610,7 +2569,7 @@ async function exportToWord(){
 }
 
 async function exportAndEmail(){
-  const html = buildReportHtml();
+  const html = await buildReportHtml();
   
   const blob = new Blob([html], {
     type: "application/msword"
@@ -2658,20 +2617,19 @@ function downloadFile(blob, filename){
 
 // === AI FORSLAG FRA BILDE ===
 
-function onFindingPhotosSelected(){
-  const files = $("findingPhotos").files;
-  const btn = $("btnAiSuggest");
-  btn.style.display = files && files.length > 0 ? "block" : "none";
-}
-
 async function suggestFromImage(){
-  const files = $("findingPhotos").files;
-  if (!files || files.length === 0) {
-    alert("Velg minst ett bilde.");
+  if (!currentFindingImageAssets || currentFindingImageAssets.length === 0) {
+    alert("Legg til minst ett bilde først.");
     return;
   }
 
-  const file = files[0]; // Bruk første bildet
+  const imageId = currentFindingImageAssets[0]; // Bruk første bildet
+  const img = await window.ImageStore.getImage(imageId);
+  if (!img) {
+    alert("Kunne ikke laste bilde.");
+    return;
+  }
+  
   const btn = $("btnAiSuggest");
   const statusDiv = $("aiSuggestStatus");
   const msgDiv = $("aiSuggestMessage");
@@ -2681,8 +2639,8 @@ async function suggestFromImage(){
   msgDiv.textContent = "Behandler bilde...";
 
   try {
-    // Konverter til base64
-    const base64 = await readFileAsDataUrl(file);
+    // Bruk annotert eller original versjon
+    const base64 = img.hasAnnotations ? img.annotatedDataURL : img.originalDataURL;
     
     // Kall backend
     const response = await fetch("/api/ai/avvik-forslag", {
