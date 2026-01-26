@@ -192,6 +192,30 @@
 }
 
 /* ========================================
+   CHIP BUTTON - For "+ Legg til" actions
+   ======================================== */
+.btn--chip {
+  border-radius: 999px;
+  padding: 10px 18px;
+  background: var(--klp-lys-granittgra);
+  border: 1.5px solid rgba(61, 61, 61, 0.18);
+  color: var(--klp-granittgra);
+  font-weight: 600;
+  min-width: auto;
+  box-shadow: 0 1px 3px rgba(0, 0, 0, 0.08);
+}
+
+.btn--chip:hover {
+  background: #e5e5e5;
+  border-color: rgba(61, 61, 61, 0.3);
+}
+
+.btn--chip:active {
+  transform: scale(0.97);
+  box-shadow: 0 1px 2px rgba(0, 0, 0, 0.1);
+}
+
+/* ========================================
    SIZE VARIANTS
    ======================================== */
 .btn--sm {
@@ -302,6 +326,27 @@
 }
 
 /* ========================================
+   REPORT ACTIONS - Wrapper for export buttons
+   ======================================== */
+.report-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .report-actions {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .report-actions .btn {
+    width: 100%;
+  }
+}
+
+/* ========================================
    MOBILE ACTION BAR - Sticky bottom
    ======================================== */
 .mobile-actionbar {
@@ -360,10 +405,26 @@
    RESPONSIVE ADJUSTMENTS
    ======================================== */
 @media (max-width: 640px) {
+  /* Mobile affordance - unmistakably tappable */
   .btn {
     min-width: 100px;
-    padding: 10px 16px;
+    min-height: 48px;
+    padding: 12px 18px;
     font-size: 15px;
+    font-weight: 600;
+    border: 1px solid rgba(0, 0, 0, 0.14);
+    box-shadow: 0 1px 3px rgba(0, 0, 0, 0.12);
+    border-radius: 12px;
+  }
+  
+  /* Secondary/Tertiary get solid background on mobile */
+  .btn--secondary {
+    background: var(--klp-hvit);
+  }
+  
+  .btn--tertiary {
+    background: var(--klp-hvit);
+    border-color: rgba(0, 0, 0, 0.14);
   }
   
   .btn--lg {
@@ -373,9 +434,15 @@
   }
   
   .btn--sm {
-    padding: 7px 14px;
-    min-height: 34px;
+    padding: 9px 14px;
+    min-height: 36px;
     font-size: 14px;
+  }
+  
+  .btn--chip {
+    min-height: 42px;
+    padding: 10px 20px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.14);
   }
 }
 
