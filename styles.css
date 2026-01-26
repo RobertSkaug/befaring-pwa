@@ -29,44 +29,66 @@ input, select, textarea{
   background: #fff;
 }
 
-/* Knapper - moderat større for bedre tilgjengelighet */
-.btn, button.btn{
+/* Knapper - tre nivåer for tydelig hierarki */
+.btn, button.btn {
   display: inline-flex;
   align-items: center;
   justify-content: center;
   gap: 6px;
-  padding: 12px 16px;
-  min-height: 35px;
-  border-radius: 12px;
-  border: 1px solid var(--b);
-  background: #fff;
-  color: var(--g);
+  padding: 12px 18px;
+  min-height: 44px;
+  min-width: 120px;
+  border-radius: 8px;
   font-size: 16px;
   font-weight: 600;
   cursor: pointer;
   transition: all 0.2s ease;
   text-align: center;
   text-decoration: none;
+  border: none;
+  background: transparent;
+  color: #555;
 }
 
-.btn:hover{
-  background: #f8f9fa;
-  border-color: #999;
+/* Primærknapp - viktigste handlinger */
+.btn.primary, .btn-primary {
+  background: var(--p);
+  color: #fff;
+  border: none;
 }
 
-.btn:active{
+.btn.primary:hover, .btn-primary:hover {
+  background: #c91756;
+  box-shadow: 0 4px 12px rgba(229,28,102,0.3);
+}
+
+.btn.primary:active, .btn-primary:active {
   transform: scale(0.98);
 }
 
-.btn.primary{
-  background: var(--p);
-  border-color: var(--p);
-  color: #fff;
+/* Sekundærknapp - støttehandlinger */
+.btn.secondary, .btn-secondary {
+  background: transparent;
+  border: 2px solid var(--p);
+  color: var(--p);
 }
 
-.btn.primary:hover{
-  background: #c91756;
+.btn.secondary:hover, .btn-secondary:hover {
+  background: rgba(229,28,102,0.05);
   border-color: #c91756;
+}
+
+/* Tertiærknapp - mindre viktige handlinger */
+.btn.tertiary, .btn-tertiary {
+  background: transparent;
+  color: #555;
+  border: none;
+  min-width: auto;
+}
+
+.btn.tertiary:hover, .btn-tertiary:hover {
+  color: var(--g);
+  background: rgba(0,0,0,0.03);
 }
 
 .report-preview {
