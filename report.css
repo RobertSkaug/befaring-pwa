@@ -362,14 +362,37 @@ body {
     page-break-after: auto;
   }
   
-  /* Unngå farger som ikke printer godt */
+  /* Preserve all colors for printing */
   .report__infobox {
-    background: #f9f9f9;
-    border-left: 3px solid #000;
+    background: #FFE1E1 !important;
+    border-left: 6px solid #3D3D3D !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
   
   .report h3 {
-    background: #f0f0f0;
+    background: #CDFAE2 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .report__objects {
+    background: #F0F0F0 !important;
+    border-left-color: #CDFAE2 !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .report h2 {
+    border-bottom-color: #3D3D3D !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
+  }
+
+  .report__header {
+    border-left-color: #3D3D3D !important;
+    -webkit-print-color-adjust: exact !important;
+    print-color-adjust: exact !important;
   }
 }
 

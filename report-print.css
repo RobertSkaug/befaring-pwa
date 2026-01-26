@@ -1,0 +1,186 @@
+/* ============================================
+   report-print.css
+   
+   Dedikert print-CSS for fargeikonoserving
+   i rapport-preview og PDF-eksport
+   ============================================ */
+
+@media print {
+  /* =========================
+     A) GLOBAL FARGEIKONOSERVING
+     ========================= */
+  html, body {
+    -webkit-print-color-adjust: exact;  /* Chrome/Edge/Safari */
+    print-color-adjust: exact;          /* Standard (CSS Conditional 4) */
+    color-adjust: exact;                /* Backup */
+  }
+
+  /* Sikre at alle elementer i rapport bevarer farger */
+  .report,
+  .report * {
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+    color-adjust: exact;
+  }
+
+  /* =========================
+     B) A4-FORMAT OG MARGINER
+     ========================= */
+  @page {
+    size: A4 portrait;
+    margin: 18mm 16mm 18mm 16mm;
+  }
+
+  /* =========================
+     C) GRUNNLEGGENDE TEKST OG BAKGRUNN
+     ========================= */
+  body {
+    background: #fff !important;
+    color: #111 !important;
+    font-family: Georgia, 'Times New Roman', serif;
+    font-size: 11pt;
+    line-height: 1.4;
+  }
+
+  .report {
+    background: #fff !important;
+    color: #111 !important;
+    max-width: 100%;
+    padding: 0;
+    margin: 0;
+  }
+
+  /* =========================
+     D) FARGEDE ELEMENTER
+     (sikrer at spesifikke farger kommer med)
+     ========================= */
+
+  /* Info-bokser (rosa) */
+  .report__infobox {
+    background-color: #FFE1E1 !important;
+    border-left-color: #3D3D3D !important;
+    color: #555 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  .report__infobox p {
+    color: #555 !important;
+  }
+
+  /* H3-overskrifter med grønn bakgrunn */
+  .report h3 {
+    background-color: #CDFAE2 !important;
+    color: #3D3D3D !important;
+    border-radius: 2mm;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Objekt-bokser (grå) */
+  .report__objects {
+    background-color: #F0F0F0 !important;
+    border-left-color: #CDFAE2 !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* H2-overskrifter med grå border */
+  .report h2 {
+    border-bottom-color: #3D3D3D !important;
+    color: #3D3D3D !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Rapport-header */
+  .report__header {
+    border-left-color: #3D3D3D !important;
+    background: #fff !important;
+    color: #3D3D3D !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* Uthevet tekst (rosa) */
+  .report strong {
+    color: #E51C66 !important;
+    font-weight: 700;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+
+  /* =========================
+     E) SIDESKIFT-REGLER
+     ========================= */
+  h1, h2, h3, h4 {
+    break-after: avoid-page;
+    page-break-after: avoid;
+  }
+
+  .report section,
+  .report figure,
+  .avoid-break {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .report__infobox,
+  .report__objects,
+  .report__findings li {
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  .page-break {
+    break-before: page;
+    page-break-before: always;
+  }
+
+  /* =========================
+     F) BILDER
+     ========================= */
+  img {
+    max-width: 100% !important;
+    height: auto !important;
+    break-inside: avoid;
+    page-break-inside: avoid;
+  }
+
+  /* =========================
+     G) SKJUL ELEMENTER I PRINT
+     ========================= */
+  .no-print,
+  .report-header,
+  .report-preview::before,
+  .report::after {
+    display: none !important;
+  }
+
+  /* =========================
+     H) FARGER FOR ANBEFALINGER/AVVIK
+     ========================= */
+  .report__findings li::before {
+    color: #3D3D3D !important;
+    font-weight: 700;
+  }
+
+  .report .chip,
+  .report .panel,
+  .report .cardHeader {
+    background-color: #f2f2f2 !important;
+    border: 1px solid #ddd !important;
+    -webkit-print-color-adjust: exact;
+    print-color-adjust: exact;
+  }
+}
+
+/* =========================
+   SKJERMVISNING (ikke print)
+   ========================= */
+@media screen {
+  /* Valgfritt: spesiell styling for preview-modus */
+  .report {
+    margin: 20px auto;
+  }
+}

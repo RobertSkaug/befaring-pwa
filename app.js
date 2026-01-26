@@ -2498,21 +2498,56 @@ async function renderReportPreview() {
 }
 
 async function printReport(reportHtml) {
-  // Fetch report.css som tekst (cache bust)
+  // Fetch report.css og report-print.css som tekst (cache bust)
   const reportCss = await fetch("./report.css", { cache: "no-store" })
     .then(r => r.text())
     .catch(() => "");
 
-  // Print-spesifikke CSS regler
+  const printStylesCss = await fetch("./report-print.css", { cache: "no-store" })
+    .then(r => r.text())
+    .catch(() => "");
+
+  // Print-spesifikke CSS regler med fargeikonoserving
   const printCss = `
     @page { size: A4; margin: 16mm; }
     @media print {
-      * { -webkit-print-color-adjust: exact; print-color-adjust: exact; }
-      html, body { background:#fff !important; }
+      * { 
+        -webkit-print-color-adjust: exact !important; 
+        print-color-adjust: exact !important;
+        color-adjust: exact !important;
+      }
+      html, body { 
+        background:#fff !important; 
+        color: #111 !important;
+      }
       img { max-width: 100% !important; height: auto !important; }
       .no-print { display:none !important; }
       .avoid-break { break-inside: avoid; page-break-inside: avoid; }
       h1,h2,h3 { break-after: avoid-page; page-break-after: avoid; }
+      
+      /* Sikre alle farger blir printet */
+      .report__infobox {
+        background: #FFE1E1 !important;
+        border-left-color: #3D3D3D !important;
+      }
+      .report h3 {
+        background: #CDFAE2 !important;
+        color: #3D3D3D !important;
+      }
+      .report__objects {
+        background: #F0F0F0 !important;
+        border-left-color: #CDFAE2 !important;
+      }
+      .report h2 {
+        border-bottom-color: #3D3D3D !important;
+        color: #3D3D3D !important;
+      }
+      .report__header {
+        border-left-color: #3D3D3D !important;
+      }
+      .report strong {
+        color: #E51C66 !important;
+      }
     }
   `;
 
@@ -2525,7 +2560,7 @@ async function printReport(reportHtml) {
   
   w.document.open();
   w.document.write(`<!doctype html><html><head><meta charset="utf-8">
-    <style>${reportCss}</style><style>${printCss}</style>
+    <style>${reportCss}</style><style>${printStylesCss}</style><style>${printCss}</style>
     </head><body>${reportHtml}</body></html>`);
   w.document.close();
   w.focus();
