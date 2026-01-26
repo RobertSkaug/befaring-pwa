@@ -393,15 +393,16 @@ function init(){
     if(el){
       el.addEventListener("click", (e) => {
         if(pop && typeof pop.showPopover === "function"){
-          // Position near the button
-          const r = el.getBoundingClientRect();
-          pop.style.position = "fixed";
-          const top = Math.min(r.bottom + 8, window.innerHeight - 20);
-          const left = Math.min(Math.max(r.left - 200 + 24, 12), window.innerWidth - 12);
-          pop.style.top = `${top}px`;
-          pop.style.left = `${left}px`;
-          // Toggle: if already open, hide; else show
-          if(pop.matches(":popover-open")) pop.hidePopover(); else pop.showPopover();
+          // Toggle
+          if(pop.matches(":popover-open")) { pop.hidePopover(); return; }
+          // Show first to measure size, then position and re-show
+          pop.showPopover();
+          positionHelpPopover(el, pop);
+          // Close button inside popover
+          const closeBtn = pop.querySelector(".help-popover__close");
+          if(closeBtn){
+            closeBtn.onclick = () => pop.hidePopover();
+          }
         } else {
           // Fallback to modal
           openHelpModal(map.title, pop ? pop.textContent : "");
@@ -409,6 +410,26 @@ function init(){
       });
     }
   });
+
+  window.addEventListener("resize", () => {
+    // Reposition any open help popovers to maintain anchoring
+    Object.keys(helpMap).forEach(id => {
+      const el = $(id);
+      const pop = $(helpMap[id].popId);
+      if(el && pop && pop.matches(":popover-open")) positionHelpPopover(el, pop);
+    });
+  });
+function positionHelpPopover(anchorEl, pop){
+  const r = anchorEl.getBoundingClientRect();
+  pop.style.position = "fixed";
+  const top = Math.min(r.bottom + 10, window.innerHeight - 20);
+  // Temporarily compute width
+  const rect = pop.getBoundingClientRect();
+  let left = r.left + (r.width/2) - (rect.width/2);
+  left = Math.max(12, Math.min(left, window.innerWidth - rect.width - 12));
+  pop.style.top = `${top}px`;
+  pop.style.left = `${left}px`;
+}
 
   // Først: last tidligere lagret data hvis det finnes
   loadBuild();

@@ -266,7 +266,10 @@
       <label style="margin:0;">Bygningsbeskrivelse</label>
       <button class="btn-icon" id="btnHelpDesc" title="Hjelpetekst">?</button>
       <div popover="auto" id="popDesc" class="help-popover">
-        Her føres korte kommentarer til den skjematiske fremstilling av bygget i tabellen. For eksempel kan det beskrives litt nærmere om; isolasjons materialer, innvendige brannvegger, avstand til nabobygg, eller andre forhold som kan betydning for risikovurderingen av anlegget.
+        <button class="help-popover__close" aria-label="Lukk">×</button>
+        <div class="help-popover__content">
+          Her føres korte kommentarer til den skjematiske fremstilling av bygget i tabellen. For eksempel kan det beskrives litt nærmere om; isolasjons materialer, innvendige brannvegger, avstand til nabobygg, eller andre forhold som kan betydning for risikovurderingen av anlegget.
+        </div>
       </div>
     </div>
     <textarea id="bDesc"></textarea>
@@ -275,7 +278,10 @@
       <label style="margin:0;">Sikkerhetsforhold</label>
       <button class="btn-icon" id="btnHelpSafety" title="Hjelpetekst">?</button>
       <div popover="auto" id="popSafety" class="help-popover">
-        Her beskrives kort branntekniske eller andre risikoforhold som for eks.: Utplassering og merking av slukkeutstyr, avfallshåndtering, orden i rømningsveier, tilstanden til branndører, innbruddsikring osv. Er det lite å bemerke og man ikke finner det formålstjenlig å utstede liste med anbefalinger eller fotorapport kan befaringsrapporten avsluttes her og øvrige sider slettes.
+        <button class="help-popover__close" aria-label="Lukk">×</button>
+        <div class="help-popover__content">
+          Her beskrives kort branntekniske eller andre risikoforhold som for eks.: Utplassering og merking av slukkeutstyr, avfallshåndtering, orden i rømningsveier, tilstanden til branndører, innbruddsikring osv. Er det lite å bemerke og man ikke finner det formålstjenlig å utstede liste med anbefalinger eller fotorapport kan befaringsrapporten avsluttes her og øvrige sider slettes.
+        </div>
       </div>
     </div>
     <textarea id="bSafety"></textarea>
@@ -284,7 +290,10 @@
       <label style="margin:0;">Generell vurdering av risiko</label>
       <button class="btn-icon" id="btnHelpRisk" title="Hjelpetekst">?</button>
       <div popover="auto" id="popRisk" class="help-popover">
-        Her beskrives den generelle vurderingen av risikoen, som ikke omfatter bygningsbeskrivelse eller sikkerhetsforhold. Forvaltning, drift og vedlikehold skal kommenteres spesifikt her.
+        <button class="help-popover__close" aria-label="Lukk">×</button>
+        <div class="help-popover__content">
+          Her beskrives den generelle vurderingen av risikoen, som ikke omfatter bygningsbeskrivelse eller sikkerhetsforhold. Forvaltning, drift og vedlikehold skal kommenteres spesifikt her.
+        </div>
       </div>
     </div>
     <textarea id="bRisk"></textarea>
