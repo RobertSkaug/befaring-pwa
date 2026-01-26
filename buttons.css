@@ -401,7 +401,7 @@
 }
 
 /* ========================================
-   CONSTRUCTION CHIPS - Fargekodet material/beskyttelse
+   CONSTRUCTION CHIPS - Felles KLP-farge
    ======================================== */
 .construction-chip {
   display: inline-flex;
@@ -411,35 +411,24 @@
   border-radius: 16px;
   font-size: 13px;
   font-weight: 600;
-  border: 1.5px solid;
-  background: var(--klp-hvit);
+  border: 1.5px solid var(--klp-fjellgronn);
+  background: var(--klp-lys-fjellgronn);
   cursor: pointer;
   transition: all 0.15s ease;
-  color: var(--klp-granittgra);
+  color: var(--klp-svart);
 }
 
-/* Material chips - lys grønn */
-.construction-chip--material {
+.construction-chip--material,
+.construction-chip--protection {
   background: var(--klp-lys-fjellgronn);
   border-color: var(--klp-fjellgronn);
   color: var(--klp-svart);
 }
 
-.construction-chip--material:hover {
+.construction-chip--material:hover,
+.construction-chip--protection:hover {
   background: #b3f3e1;
   border-color: #0a9870;
-}
-
-/* Protection chips - lys rød/rosa */
-.construction-chip--protection {
-  background: var(--klp-lys-morgenrod);
-  border-color: var(--klp-morgenrod);
-  color: var(--klp-svart);
-}
-
-.construction-chip--protection:hover {
-  background: #ffc0d0;
-  border-color: #c91756;
 }
 
 .construction-chip .remove-btn {

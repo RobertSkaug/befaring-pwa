@@ -1150,7 +1150,7 @@ function openProtectionPicker(){
   const list = $("protectionPickerList");
 
   list.innerHTML = PROTECTION.map(p => {
-    return `<button class="btn btn--sm" style="background:var(--klp-lys-morgenrod); border-color:var(--klp-morgenrod); color:var(--klp-svart);" data-select-prot="${p.code}">${esc(p.label)}</button>`;
+    return `<button class="btn btn--sm" style="background:var(--klp-lys-fjellgronn); border-color:var(--klp-fjellgronn); color:var(--klp-svart);" data-select-prot="${p.code}">${esc(p.label)}</button>`;
   }).join("");
 
   $("closeProtectionPicker").addEventListener("click", () => modal.remove());
