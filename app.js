@@ -2339,12 +2339,8 @@ ${protectionHtml}
   }
   
   // Returner kun body-innholdet (for print med ekstern CSS)
-  return `<article class="report">
-
-<!-- KLP-logo header for print -->
-<div class="report__logo-header">
-  <img src="./icons/KLP_logo_koksgraa.png" alt="KLP logo" class="report__logo">
-</div>
+  return `<div class="klp-watermark"></div>
+<article class="report">
 
 <!-- Header / Faktaboks -->
 <div class="report__header">

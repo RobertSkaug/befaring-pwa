@@ -28,13 +28,31 @@
      ========================= */
   @page {
     size: A4 portrait;
-    margin: 18mm 16mm 18mm 16mm;
-    
-    /* KLP-logo som header på alle sider */
-    @top-left {
-      content: url('./icons/KLP_logo_koksgraa.png');
-      margin-bottom: 10mm;
-    }
+    margin: 25mm 20mm 20mm 20mm;
+  }
+
+  /* =========================
+     KLP WATERMARK (gjentas på alle sider)
+     ========================= */
+  .klp-watermark {
+    position: fixed;
+    top: 12mm;
+    right: 20mm;
+    width: 45mm;
+    height: 20mm;
+    background-image: url('./icons/KLP_logo_koksgraa.png');
+    background-repeat: no-repeat;
+    background-size: contain;
+    background-position: right top;
+    opacity: 0.08;
+    z-index: 0;
+    pointer-events: none;
+  }
+
+  /* Sikrer at innholdet alltid ligger over watermark */
+  body {
+    position: relative;
+    z-index: 1;
   }
 
   /* =========================
@@ -179,30 +197,6 @@
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
-
-  /* =========================
-     I) KLP-LOGO HEADER
-     ========================= */
-  .report__logo-header {
-    text-align: center;
-    padding: 0 0 8mm 0;
-    margin-bottom: 6mm;
-    border-bottom: 1px solid #e0e0e0;
-    page-break-after: avoid;
-  }
-
-  .report__logo {
-    max-width: 60mm;
-    height: auto;
-    display: inline-block;
-  }
-
-  /* Skjul logo-header på skjerm, kun vist i print */
-  @media screen {
-    .report__logo-header {
-      display: none;
-    }
-  }
 }
 
 /* =========================
@@ -214,7 +208,8 @@
     margin: 20px auto;
   }
 
-  .report__logo-header {
+  /* Skjul watermark på skjerm */
+  .klp-watermark {
     display: none;
   }
 }
