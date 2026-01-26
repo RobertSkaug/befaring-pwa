@@ -1,3 +1,19 @@
+.help-popover {
+  padding: 10px 12px;
+  background: #fff;
+  border: 1px solid var(--b);
+  border-radius: 12px;
+  box-shadow: var(--sh);
+  max-width: 460px;
+  color: var(--g);
+  font-size: 13px;
+  line-height: 1.5;
+}
+
+/* Popover position adjustments for mobile */
+@media (max-width: 640px) {
+  .help-popover { max-width: calc(100vw - 32px); }
+}
 :root{
   --g:#3D3D3D; --p:#E51C66; --gr:#0DB28A;
   --mut:#6b7280; --b:rgba(61,61,61,.18);

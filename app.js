@@ -382,23 +382,31 @@ function init(){
   $("btnAddImageAnnotations").addEventListener("click", startImageCapture);
   // Help icons for field guidance
   const helpMap = {
-    btnHelpDesc: {
-      title: "Bygningsbeskrivelse",
-      text: "Her føres korte kommentarer til den skjematiske fremstilling av bygget i tabellen. For eksempel kan det beskrives litt nærmere om; isolasjons materialer, innvendige brannvegger, avstand til nabobygg, eller andre forhold som kan betydning for risikovurderingen av anlegget."
-    },
-    btnHelpSafety: {
-      title: "Sikkerhetsforhold",
-      text: "Her beskrives kort branntekniske eller andre risikoforhold som for eks.: Utplassering og merking av slukkeutstyr, avfallshåndtering, orden i rømningsveier, tilstanden til branndører, innbruddsikring osv. Er det lite å bemerke og man ikke finner det formålstjenlig å utstede liste med anbefalinger eller fotorapport kan befaringsrapporten avsluttes her og øvrige sider slettes."
-    },
-    btnHelpRisk: {
-      title: "Generell vurdering av risiko",
-      text: "Her beskrives den generelle vurderingen av risikoen, som ikke omfatter bygningsbeskrivelse eller sikkerhetsforhold. Forvaltning, drift og vedlikehold skal kommenteres spesifikt her."
-    }
+    btnHelpDesc: { popId: "popDesc", title: "Bygningsbeskrivelse" },
+    btnHelpSafety: { popId: "popSafety", title: "Sikkerhetsforhold" },
+    btnHelpRisk: { popId: "popRisk", title: "Generell vurdering av risiko" }
   };
   Object.keys(helpMap).forEach(id => {
     const el = $(id);
+    const map = helpMap[id];
+    const pop = $(map.popId);
     if(el){
-      el.addEventListener("click", () => openHelpModal(helpMap[id].title, helpMap[id].text));
+      el.addEventListener("click", (e) => {
+        if(pop && typeof pop.showPopover === "function"){
+          // Position near the button
+          const r = el.getBoundingClientRect();
+          pop.style.position = "fixed";
+          const top = Math.min(r.bottom + 8, window.innerHeight - 20);
+          const left = Math.min(Math.max(r.left - 200 + 24, 12), window.innerWidth - 12);
+          pop.style.top = `${top}px`;
+          pop.style.left = `${left}px`;
+          // Toggle: if already open, hide; else show
+          if(pop.matches(":popover-open")) pop.hidePopover(); else pop.showPopover();
+        } else {
+          // Fallback to modal
+          openHelpModal(map.title, pop ? pop.textContent : "");
+        }
+      });
     }
   });
 
