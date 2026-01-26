@@ -219,28 +219,22 @@
       <div></div>
     </div>
 
-    <label>Bygningsmaterialer</label>
-    <div class="chips" id="matChips"></div>
+    <hr style="margin:16px 0; border:none; border-top:1px solid #eee;">
 
-    <label>Beskyttelse</label>
-    <div class="chips" id="protChips"></div>
+    <h4>Konstruksjon – Materialer og Beskyttelse</h4>
+    
+    <div class="report__infobox" style="margin-bottom:16px;">
+      <p>
+        Valg av materialer og beskyttelse knyttes til konstruksjonsdeler.
+        <strong style="color:#0DB28A;">Grønn farge = Materialer</strong>,
+        <strong style="color:#E51C66;">rød farge = Beskyttelse</strong>.
+      </p>
+    </div>
 
-    <h4 style="margin-top:14px;">Konstruksjon</h4>
-
-    <label>Søyler</label>
-    <div class="chips" id="colChips"></div>
-
-    <label>Bjelker</label>
-    <div class="chips" id="beamChips"></div>
-
-    <label>Dekke</label>
-    <div class="chips" id="deckChips"></div>
-
-    <label>Tak</label>
-    <div class="chips" id="roofChips"></div>
-
-    <label>Yttervegg</label>
-    <div class="chips" id="wallChips"></div>
+    <!-- Konstruksjonsdeler med Materialer/Beskyttelse-valg -->
+    <div id="constructionPartsContainer">
+      <!-- Rendres dynamisk fra app.js -->
+    </div>
 
     <label>Bygningsbeskrivelse</label>
     <textarea id="bDesc"></textarea>
