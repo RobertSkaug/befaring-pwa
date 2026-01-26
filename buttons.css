@@ -281,6 +281,82 @@
 }
 
 /* ========================================
+   BUTTON ROW - Responsive container
+   ======================================== */
+.btn-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  align-items: center;
+}
+
+@media (max-width: 640px) {
+  .btn-row {
+    flex-direction: column;
+    gap: 10px;
+  }
+  
+  .btn-row .btn {
+    width: 100%;
+  }
+}
+
+/* ========================================
+   MOBILE ACTION BAR - Sticky bottom
+   ======================================== */
+.mobile-actionbar {
+  position: relative;
+  margin-top: 24px;
+}
+
+@media (max-width: 640px) {
+  .mobile-actionbar {
+    position: fixed;
+    bottom: 0;
+    left: 0;
+    right: 0;
+    background: rgba(255, 255, 255, 0.95);
+    backdrop-filter: blur(12px);
+    padding: 12px 16px;
+    padding-bottom: calc(12px + env(safe-area-inset-bottom));
+    border-top: 1px solid var(--klp-lys-granittgra);
+    box-shadow: 0 -4px 16px rgba(0, 0, 0, 0.08);
+    z-index: 100;
+    margin-top: 0;
+  }
+  
+  .mobile-actionbar .btn-row {
+    max-width: 980px;
+    margin: 0 auto;
+  }
+}
+
+/* ========================================
+   TOUCH DEVICE FIXES
+   ======================================== */
+@media (hover: none) and (pointer: coarse) {
+  .btn:hover {
+    transform: none;
+  }
+  
+  .btn--primary:hover {
+    transform: none;
+  }
+  
+  .btn--danger:hover {
+    transform: none;
+  }
+  
+  .btn--icon:active {
+    transform: scale(0.95);
+  }
+  
+  .tool-btn:hover {
+    transform: none;
+  }
+}
+
+/* ========================================
    RESPONSIVE ADJUSTMENTS
    ======================================== */
 @media (max-width: 640px) {

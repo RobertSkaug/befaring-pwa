@@ -16,7 +16,36 @@ body{margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-s
 .t1{font-weight:900; font-size:14px;}
 .t2{color:var(--mut); font-size:12px;}
 .actions{display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end}
+
+/* Scrollable topnav på mobil */
+@media (max-width: 640px) {
+  .actions {
+    flex-wrap: nowrap;
+    overflow-x: auto;
+    -webkit-overflow-scrolling: touch;
+    scrollbar-width: none; /* Firefox */
+    -ms-overflow-style: none; /* IE/Edge */
+  }
+  
+  .actions::-webkit-scrollbar {
+    display: none; /* Chrome/Safari */
+  }
+  
+  .actions .btn {
+    flex-shrink: 0;
+    white-space: nowrap;
+  }
+}
+
 main{padding: 14px 0 34px;}
+
+/* Extra padding på mobil når sticky actionbar er aktiv */
+@media (max-width: 640px) {
+  main {
+    padding-bottom: 100px; /* Rom for sticky actionbar */
+  }
+}
+
 .card{background: rgba(255,255,255,.94); border:1px solid var(--b); border-radius: var(--r); box-shadow: var(--sh); padding: 14px; margin-top: 12px;}
 h2{margin:0 0 10px; font-size:16px;}
 label{display:block; margin:10px 0 6px; font-size:12px; color: var(--mut);}

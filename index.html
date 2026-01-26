@@ -62,7 +62,7 @@
       </div>
     </div>
 
-    <div class="inline">
+    <div class="btn-row">
       <button class="btn btn--secondary" id="btnSearchBrreg">Søk</button>
       <span class="status" id="brregStatus">BRREG: klar</span>
     </div>
@@ -113,8 +113,10 @@
       </div>
     </div>
 
-    <div class="footerActions">
-      <button class="btn btn--primary" id="btnStartInspection">Start befaring</button>
+    <div class="mobile-actionbar">
+      <div class="btn-row">
+        <button class="btn btn--primary" id="btnStartInspection">Start befaring</button>
+      </div>
     </div>
   </section>
 
@@ -138,7 +140,7 @@
       </div>
     </div>
 
-    <div class="inline">
+    <div class="btn-row">
       <button class="btn btn--secondary" id="btnGPS">Hent GPS + foreslå adresser</button>
       <span class="pill"><span class="dot green"></span><span id="gpsStatus">GPS: ikke hentet</span></span>
     </div>
@@ -182,7 +184,7 @@
       <div class="muted" id="businessStatus" style="margin-top:6px;"></div>
     </div>
 
-    <div class="inline">
+    <div class="btn-row">
       <button class="btn btn--secondary" id="btnSuggestBusiness">Foreslå virksomhet (offentlige kilder)</button>
       <span class="muted" id="businessStatus"></span>
     </div>
@@ -249,8 +251,10 @@
     <label>Generell vurdering av risiko</label>
     <textarea id="bRisk"></textarea>
 
-    <div class="footerActions">
-      <button class="btn btn--secondary" id="btnToFindings">Registrer avvik/anbefaling</button>
+    <div class="mobile-actionbar">
+      <div class="btn-row">
+        <button class="btn btn--secondary" id="btnToFindings">Registrer avvik/anbefaling</button>
+      </div>
     </div>
   </section>
 
@@ -294,13 +298,13 @@
     <label>Beskrivelse</label>
     <textarea id="findingDesc" placeholder="Hva er observert? Hva anbefales?"></textarea>
 
-    <div class="inline" style="margin-top: 12px;">
+    <div class="btn-row" style="margin-top: 12px;">
       <button class="btn btn--primary" id="btnAddImageAnnotations">📷 Legg til bilder</button>
     </div>
 
     <div id="imageThumbnails"></div>
 
-    <div class="inline">
+    <div class="btn-row">
       <button class="btn btn--secondary" id="btnAiSuggest" style="display:none;">🤖 Foreslå tekst fra bilde (AI)</button>
     </div>
 
@@ -308,16 +312,20 @@
       <div class="muted" id="aiSuggestMessage"></div>
     </div>
 
-    <div class="inline">
-      <button class="btn btn--primary" id="btnAddFinding">Lagre avvik anbefaling</button>
+    <div class="mobile-actionbar">
+      <div class="btn-row">
+        <button class="btn btn--primary" id="btnAddFinding">Lagre avvik anbefaling</button>
+      </div>
     </div>
 
     <div id="findingList"></div>
 
     <hr style="margin:24px 0; border:none; border-top:1px solid #eee;">
 
-    <div class="footerActions">
-      <button class="btn btn--tertiary" id="btnBackToLocations">Tilbake: Lokasjoner</button>
+    <div class="mobile-actionbar">
+      <div class="btn-row">
+        <button class="btn btn--tertiary" id="btnBackToLocations">Tilbake: Lokasjoner</button>
+      </div>
     </div>
   </section>
 
@@ -325,7 +333,7 @@
   <section class="card" id="stepReport" style="display:none;">
     <div class="report-header">
       <h1>Rapport</h1>
-      <div class="inline">
+      <div class="btn-row">
         <button class="btn btn--secondary" id="btnExportPDF">📄 Åpne som PDF</button>
         <button class="btn btn--primary" id="btnExportEmail">📧 Send på e-post</button>
         <button class="btn btn--secondary" id="btnExportWord">📝 Last ned Word</button>
