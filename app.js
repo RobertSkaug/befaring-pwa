@@ -1479,7 +1479,7 @@ ${protectionHtml}
   // Kapittel 2: Avvik (MED bilder)
   const avvikList = state.findings.filter(f => (f.type || "").toUpperCase() === "AVVIK");
   let avvikSection = "";
-  avvikList.forEach((f, idx) => {
+  for (const [idx, f] of avvikList.entries()) {
     const num = idx + 1;
     const loc = state.locations.find(l => l.id === f.locationId);
     const bld = loc?.buildings.find(b => b.id === f.buildingId);
@@ -1539,12 +1539,12 @@ ${protectionHtml}
   ${dueDateText}
 </li>
 `;
-  });
+  }
   
   // Kapittel 3: Anbefalinger (MED bilder)
   const anbList = state.findings.filter(f => (f.type || "").toUpperCase() === "ANBEFALING");
   let anbSection = "";
-  anbList.forEach((f, idx) => {
+  for (const [idx, f] of anbList.entries()) {
     const num = idx + 1;
     const loc = state.locations.find(l => l.id === f.locationId);
     const bld = loc?.buildings.find(b => b.id === f.buildingId);
@@ -1584,7 +1584,7 @@ ${protectionHtml}
   ${dueDateText}
 </li>
 `;
-  });
+  }
   
   // Kapittel 4 er fjernet - bilder vises nå inline i avvik og anbefalinger
 
@@ -2229,7 +2229,7 @@ ${protectionHtml}
   // Kapittel 2: Avvik (MED bilder)
   const avvikList = state.findings.filter(f => (f.type || "").toUpperCase() === "AVVIK");
   let avvikSection = "";
-  avvikList.forEach((f, idx) => {
+  for (const [idx, f] of avvikList.entries()) {
     const num = idx + 1;
     const loc = state.locations.find(l => l.id === f.locationId);
     const bld = loc?.buildings.find(b => b.id === f.buildingId);
@@ -2290,12 +2290,12 @@ ${protectionHtml}
   ${dueDateText}
 </li>
 `;
-  });
+  }
   
   // Kapittel 3: Anbefalinger (MED bilder)
   const anbList = state.findings.filter(f => (f.type || "").toUpperCase() === "ANBEFALING");
   let anbSection = "";
-  anbList.forEach((f, idx) => {
+  for (const [idx, f] of anbList.entries()) {
     const num = idx + 1;
     const loc = state.locations.find(l => l.id === f.locationId);
     const bld = loc?.buildings.find(b => b.id === f.buildingId);
@@ -2336,7 +2336,7 @@ ${protectionHtml}
   ${dueDateText}
 </li>
 `;
-  });
+  }
   
   // Returner kun body-innholdet (for print med ekstern CSS)
   return `<article class="report">
