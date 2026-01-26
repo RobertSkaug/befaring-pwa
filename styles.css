@@ -29,59 +29,6 @@ input, select, textarea{
   background: #fff;
 }
 
-/* Primærknapper – større flater for lettere treff (≥50px høyde) */
-.btn, button.btn{
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  gap: 8px;
-  padding: 14px 18px;
-  min-height: 50px;
-  border-radius: 14px;
-  border: 2px solid var(--b);
-  background: #f6f8fb;
-  color: var(--g);
-  font-size: 17px;
-  font-weight: 700;
-  letter-spacing: 0.1px;
-  cursor: pointer;
-  transition: transform 0.08s ease, box-shadow 0.15s ease, border-color 0.15s ease, background 0.15s ease;
-  text-align: center;
-  text-decoration: none;
-}
-
-.btn:hover{
-  background: #eef4ff;
-  border-color: #b8c2d3;
-  box-shadow: 0 8px 20px rgba(0,0,0,0.08);
-}
-
-.btn:active{
-  transform: translateY(1px);
-}
-
-.btn:focus-visible{
-  outline: 3px solid rgba(13,178,138,0.35);
-  outline-offset: 2px;
-}
-
-.btn.primary{
-  background: var(--p);
-  border-color: var(--p);
-  color: #fff;
-  box-shadow: 0 10px 28px rgba(229,28,102,0.25);
-}
-
-.btn.primary:hover{
-  background: #c91756;
-  border-color: #c91756;
-}
-
-.btn.primary:active{
-  background: #b5124c;
-  border-color: #b5124c;
-}
-
 .report-preview {
   background: #eceff1;
   padding: 16px 0 32px;
