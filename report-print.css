@@ -29,6 +29,12 @@
   @page {
     size: A4 portrait;
     margin: 18mm 16mm 18mm 16mm;
+    
+    /* KLP-logo som header på alle sider */
+    @top-left {
+      content: url('./icons/KLP_logo_koksgraa.png');
+      margin-bottom: 10mm;
+    }
   }
 
   /* =========================
@@ -173,6 +179,30 @@
     -webkit-print-color-adjust: exact;
     print-color-adjust: exact;
   }
+
+  /* =========================
+     I) KLP-LOGO HEADER
+     ========================= */
+  .report__logo-header {
+    text-align: center;
+    padding: 0 0 8mm 0;
+    margin-bottom: 6mm;
+    border-bottom: 1px solid #e0e0e0;
+    page-break-after: avoid;
+  }
+
+  .report__logo {
+    max-width: 60mm;
+    height: auto;
+    display: inline-block;
+  }
+
+  /* Skjul logo-header på skjerm, kun vist i print */
+  @media screen {
+    .report__logo-header {
+      display: none;
+    }
+  }
 }
 
 /* =========================
@@ -182,5 +212,9 @@
   /* Valgfritt: spesiell styling for preview-modus */
   .report {
     margin: 20px auto;
+  }
+
+  .report__logo-header {
+    display: none;
   }
 }

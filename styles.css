@@ -34,6 +34,19 @@ input, select, textarea{
   padding: 16px 0 32px;
 }
 
+.report__logo-header {
+  text-align: center;
+  padding: 0 0 8mm 0;
+  margin-bottom: 6mm;
+  border-bottom: 1px solid #e0e0e0;
+}
+
+.report__logo {
+  max-width: 60mm;
+  height: auto;
+  display: inline-block;
+}
+
 .report {
   width: 210mm;
   min-height: 297mm;
