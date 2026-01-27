@@ -233,6 +233,10 @@ function newBuilding(id){
 
     // Ny: Beskyttelse som egen seksjon (ikke knyttet til konstruksjon)
     protectionMeasures: [], // [code]
+    protectionDetails: {
+      sprinkler: { hasReport: false, reportDate: "", score: "" },
+      alarm: { connectedToCentral: false }
+    },
     
     // LEGACY: Behold for bakoverkompatibilitet (migreres ved load)
     columns:[],
@@ -1176,7 +1180,10 @@ function renderProtectionMeasures(){
       ${chips || '<span class="muted" style="font-size:13px;">Ingen beskyttelse registrert</span>'}
       <button class="btn btn--sm" type="button" id="addProtectionBtn">+ Legg til</button>
     </div>
+    <div id="protectionExtraFields" style="margin-top:16px;"></div>
   `;
+
+  renderProtectionExtraFields();
 
   const addBtn = $("addProtectionBtn");
   if(addBtn){
@@ -1198,6 +1205,96 @@ function renderProtectionMeasures(){
       });
     }
   });
+}
+
+function renderProtectionExtraFields(){
+  const b = getActiveBuilding();
+  const container = $("protectionExtraFields");
+  if(!container) return;
+
+  b.protectionDetails = b.protectionDetails || {
+    sprinkler: { hasReport: false, reportDate: "", score: "" },
+    alarm: { connectedToCentral: false }
+  };
+
+  const hasSprinkler = b.protectionMeasures.includes("S");
+  const hasAlarm = b.protectionMeasures.includes("A");
+
+  let html = "";
+
+  if(hasSprinkler){
+    const checked = b.protectionDetails.sprinkler.hasReport ? "checked" : "";
+    const showDetails = b.protectionDetails.sprinkler.hasReport ? "" : "style='display:none;'";
+    html += `
+<div class="card" style="padding:12px; margin-bottom:12px; background:#f9f9f9;">
+  <h4 style="margin:0 0 10px; font-size:14px;">Sprinkleranlegg – Detaljer</h4>
+  <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+    <input type="checkbox" id="sprinklerHasReport" ${checked} style="width:auto;">
+    <span>Finnes det sprinklerrapport?</span>
+  </label>
+  <div id="sprinklerDetails" ${showDetails} style="margin-top:12px;">
+    <div class="row">
+      <div>
+        <label>Når er den gjennomført sist?</label>
+        <input type="date" id="sprinklerReportDate" value="${esc(b.protectionDetails.sprinkler.reportDate || "")}">
+      </div>
+      <div>
+        <label>Hvilken score har anlegget fått? (1-10)</label>
+        <input type="number" id="sprinklerScore" min="1" max="10" value="${esc(b.protectionDetails.sprinkler.score || "")}" placeholder="1-10">
+      </div>
+    </div>
+  </div>
+</div>`;
+  }
+
+  if(hasAlarm){
+    const checked = b.protectionDetails.alarm.connectedToCentral ? "checked" : "";
+    html += `
+<div class="card" style="padding:12px; margin-bottom:12px; background:#f9f9f9;">
+  <h4 style="margin:0 0 10px; font-size:14px;">Brannalarmanlegg – Detaljer</h4>
+  <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
+    <input type="checkbox" id="alarmConnected" ${checked} style="width:auto;">
+    <span>Tilknyttet alarmsentral?</span>
+  </label>
+</div>`;
+  }
+
+  container.innerHTML = html;
+
+  // Event listeners
+  const sprinklerCheckbox = $("sprinklerHasReport");
+  if(sprinklerCheckbox){
+    sprinklerCheckbox.addEventListener("change", () => {
+      b.protectionDetails.sprinkler.hasReport = sprinklerCheckbox.checked;
+      const details = $("sprinklerDetails");
+      if(details) details.style.display = sprinklerCheckbox.checked ? "" : "none";
+      saveBuild();
+    });
+  }
+
+  const sprinklerDate = $("sprinklerReportDate");
+  if(sprinklerDate){
+    sprinklerDate.addEventListener("input", () => {
+      b.protectionDetails.sprinkler.reportDate = sprinklerDate.value;
+      saveBuild();
+    });
+  }
+
+  const sprinklerScore = $("sprinklerScore");
+  if(sprinklerScore){
+    sprinklerScore.addEventListener("input", () => {
+      b.protectionDetails.sprinkler.score = sprinklerScore.value;
+      saveBuild();
+    });
+  }
+
+  const alarmCheckbox = $("alarmConnected");
+  if(alarmCheckbox){
+    alarmCheckbox.addEventListener("change", () => {
+      b.protectionDetails.alarm.connectedToCentral = alarmCheckbox.checked;
+      saveBuild();
+    });
+  }
 }
 
 function openProtectionPicker(){
@@ -2520,6 +2617,24 @@ function renderConstructionMaterialsReport(bld) {
         return p ? p.label : code;
       }).filter(Boolean).sort();
       html += `<p><strong>Beskyttelse:</strong> ${esc(labels.join(", "))}</p>\n`;
+      
+      // Add details for specific protection measures
+      if(bld.protectionDetails){
+        if(bld.protectionMeasures.includes("S") && bld.protectionDetails.sprinkler){
+          const s = bld.protectionDetails.sprinkler;
+          if(s.hasReport){
+            html += `<p style="margin-left:20px;"><em>Sprinklerrapport:</em> `;
+            if(s.reportDate) html += `Sist gjennomført ${esc(s.reportDate)}. `;
+            if(s.score) html += `Score: ${esc(s.score)}/10`;
+            html += `</p>\n`;
+          }
+        }
+        if(bld.protectionMeasures.includes("A") && bld.protectionDetails.alarm){
+          if(bld.protectionDetails.alarm.connectedToCentral){
+            html += `<p style="margin-left:20px;"><em>Brannalarmanlegg:</em> Tilknyttet alarmsentral</p>\n`;
+          }
+        }
+      }
     }
   } else {
     // FALLBACK: Les fra gamle felter
