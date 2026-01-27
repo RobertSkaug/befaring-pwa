@@ -1232,6 +1232,9 @@ function renderProtectionExtraFields(){
     <input type="checkbox" id="sprinklerHasReport" ${checked} style="width:auto;">
     <span>Finnes det sprinklerrapport?</span>
   </label>
+  <p class="muted" style="font-size:12px; margin:8px 0 0;">
+    Ikke tilgjengelig nå? Sjekk <a href="https://fgkontroll.no/" target="_blank" rel="noopener noreferrer" style="color:var(--klp-fjellgronn); text-decoration:underline;">FG Kontroll</a> for rapporter.
+  </p>
   <div id="sprinklerDetails" ${showDetails} style="margin-top:12px;">
     <div class="row">
       <div>
