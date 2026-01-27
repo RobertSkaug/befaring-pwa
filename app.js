@@ -7,6 +7,8 @@ const ADDR_CACHE_TTL_MS = 2 * 60 * 1000;
 
 let state = {
   inspectionDate: new Date().toISOString().slice(0,10),
+  reportAuthor: "",
+  attendees: [],
   customer: { orgnr:"", name:"", orgForm:"", industry:"" },
   locations: [ newLocation("LOC-1") ],
   activeLocationId: "LOC-1",
@@ -19,7 +21,7 @@ let lastAddrSuggestions = [];
 
 const $ = (id) => document.getElementById(id);
 const digits = (s) => (s||"").replace(/\D+/g,"");
-const esc = (s) => String(s??"").replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const esc = (s) => String(s??"").replace(/[&<>"']/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;','\'':'&#039;'}[c]));
 
 function newLocation(id){
   return { id, address:"", geo:{ lat:null, lng:null, accuracy:null, ts:null } };
@@ -33,7 +35,7 @@ function locationIndexById(id){
 function shortAddress(addr, fallback){
   const s = (addr||"").trim();
   if(!s) return fallback;
-  return s.length > 50 ? s.slice(0,47)+"…" : s;
+  return s.length > 50 ? s.slice(0,47)+"..." : s;
 }
 function normalizeState(){
   if(!state.locations || !Array.isArray(state.locations) || !state.locations.length){
@@ -42,8 +44,9 @@ function normalizeState(){
   if(!state.activeLocationId) state.activeLocationId = state.locations[0].id;
 
   if(!state.items || !Array.isArray(state.items)) state.items = [];
+  if(!state.attendees || !Array.isArray(state.attendees)) state.attendees = [];
+  if(!state.reportAuthor) state.reportAuthor = "";
 
-  // remove items with missing location
   const locIds = new Set(state.locations.map(l=>l.id));
   state.items = state.items.filter(it => locIds.has(it.locationId));
 }
@@ -84,6 +87,14 @@ function init(){
   normalizeState();
 
   $("inspectionDate").value = state.inspectionDate;
+  $("reportAuthor").value = state.reportAuthor || "";
+
+  // Attendees
+  $("btnAddAttendee")?.addEventListener("click", () => {
+    state.attendees.push({ name:"", title:"", employer:"" });
+    renderAttendees();
+  });
+  renderAttendees();
 
   $("orgnr").addEventListener("input", onOrgnr);
   $("customerName").addEventListener("input", e => state.customer.name = e.target.value);
@@ -91,6 +102,7 @@ function init(){
   $("industry").addEventListener("input", e => state.customer.industry = e.target.value);
 
   $("inspectionDate").addEventListener("input", e => state.inspectionDate = e.target.value);
+  $("reportAuthor")?.addEventListener("input", e => state.reportAuthor = e.target.value);
 
   $("address").addEventListener("input", e => {
     const loc = getActiveLocation();
@@ -109,11 +121,16 @@ function init(){
   $("btnExport").addEventListener("click", exportWord);
   $("btnExportPdf").addEventListener("click", exportPdf);
   $("btnShare").addEventListener("click", shareReport);
+  $("btnArchive")?.addEventListener("click", () => {
+    saveFinalInspection();
+    alert("Befaringen er lagret i arkivet.");
+  });
 
   $("itemType").addEventListener("change", () => updateItemFormVisibility());
   $("btnAddItem").addEventListener("click", addItem);
 
   renderAll();
+  loadInspectionForEditing();
 }
 
 function addLocation(){
@@ -132,6 +149,8 @@ function setActiveLocation(id){
 
 function renderAll(){
   renderLocationTabs();
+
+  renderAttendees();
 
   const loc = getActiveLocation();
   $("inspectionDate").value = state.inspectionDate || new Date().toISOString().slice(0,10);
@@ -178,6 +197,50 @@ function renderItemHeader(){
 
   $("devHeaderTitle").textContent = `Punkt – ${locName}`;
   $("devHeaderSub").textContent = `${addr} • ${count} punkt`;
+}
+
+function renderAttendees(){
+  const root = $("attendees");
+  if(!root) return;
+
+  if(!state.attendees || !state.attendees.length){
+    root.innerHTML = '<p class="muted">Ingen deltakere lagt til.</p>';
+    return;
+  }
+
+  root.innerHTML = state.attendees.map((att, idx) => `
+    <div class="row">
+      <div>
+        <label>Navn</label>
+        <input data-idx="${idx}" data-field="name" value="${esc(att.name||"")}" placeholder="Navn" />
+      </div>
+      <div>
+        <label>Tittel</label>
+        <input data-idx="${idx}" data-field="title" value="${esc(att.title||"")}" placeholder="Tittel" />
+      </div>
+      <div>
+        <label>Arbeidsgiver</label>
+        <input data-idx="${idx}" data-field="employer" value="${esc(att.employer||"")}" placeholder="Arbeidsgiver" />
+      </div>
+      <button class="btn danger" data-del="${idx}">Slett</button>
+    </div>
+  `).join("");
+
+  root.querySelectorAll("input").forEach(inp => {
+    inp.addEventListener("input", e => {
+      const idx = Number(inp.getAttribute("data-idx"));
+      const field = inp.getAttribute("data-field");
+      state.attendees[idx][field] = e.target.value;
+    });
+  });
+
+  root.querySelectorAll("[data-del]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const idx = Number(btn.getAttribute("data-del"));
+      state.attendees.splice(idx,1);
+      renderAttendees();
+    });
+  });
 }
 
 async function onOrgnr(e){
@@ -505,7 +568,9 @@ function load(){
   $("orgForm").value = state.customer?.orgForm || "";
   $("industry").value = state.customer?.industry || "";
   $("inspectionDate").value = state.inspectionDate || new Date().toISOString().slice(0,10);
+  $("reportAuthor").value = state.reportAuthor || "";
 
+  renderAttendees();
   renderAddressSuggestions([]);
   renderAll();
   alert("Lastet.");
@@ -516,6 +581,8 @@ function resetAll(){
 
   state = {
     inspectionDate: new Date().toISOString().slice(0,10),
+    reportAuthor: "",
+    attendees: [],
     customer: { orgnr:"", name:"", orgForm:"", industry:"" },
     locations: [ newLocation("LOC-1") ],
     activeLocationId: "LOC-1",
@@ -527,10 +594,78 @@ function resetAll(){
   $("orgForm").value = "";
   $("industry").value = "";
   $("inspectionDate").value = state.inspectionDate;
+  $("reportAuthor").value = "";
   $("brregStatus").textContent = "BRREG: klar";
+
+  renderAttendees();
 
   renderAddressSuggestions([]);
   renderAll();
+}
+
+// Arkivlagring av fullført befaring
+function saveFinalInspection(){
+  const inspections = JSON.parse(localStorage.getItem("savedInspections") || "[]");
+  const isEditing = Boolean(state.id);
+  const id = isEditing ? state.id : Date.now();
+
+  const payload = {
+    id,
+    inspectionDate: state.inspectionDate,
+    reportAuthor: state.reportAuthor,
+    attendees: state.attendees,
+    customer: state.customer,
+    locations: state.locations,
+    activeLocationId: state.activeLocationId,
+    items: state.items,
+    savedDate: new Date().toISOString()
+  };
+
+  const idx = inspections.findIndex(x => x.id === id);
+  if(idx >= 0){
+    inspections[idx] = payload;
+  } else {
+    inspections.push(payload);
+  }
+
+  localStorage.setItem("savedInspections", JSON.stringify(inspections));
+  state.id = id;
+  return id;
+}
+
+function loadInspectionForEditing(){
+  const raw = sessionStorage.getItem("editingInspection");
+  if(!raw) return;
+  try{
+    const data = JSON.parse(raw);
+    state = {
+      id: data.id,
+      inspectionDate: data.inspectionDate || new Date().toISOString().slice(0,10),
+      reportAuthor: data.reportAuthor || "",
+      attendees: data.attendees || [],
+      customer: data.customer || { orgnr:"", name:"", orgForm:"", industry:"" },
+      locations: data.locations || [ newLocation("LOC-1") ],
+      activeLocationId: data.activeLocationId || (data.locations?.[0]?.id || "LOC-1"),
+      items: data.items || []
+    };
+    normalizeState();
+
+    $("orgnr").value = state.customer.orgnr || "";
+    $("customerName").value = state.customer.name || "";
+    $("orgForm").value = state.customer.orgForm || "";
+    $("industry").value = state.customer.industry || "";
+    $("inspectionDate").value = state.inspectionDate;
+    $("reportAuthor").value = state.reportAuthor;
+
+    renderAttendees();
+    renderAddressSuggestions([]);
+    renderAll();
+
+    sessionStorage.removeItem("editingInspection");
+    alert("✏️ Redigerer lagret befaring. Klikk Arkiver eller Eksporter for å oppdatere.");
+  } catch(e){
+    console.error("Kunne ikke laste editingInspection", e);
+  }
 }
 
 function buildReportHtml({ forPrint }){

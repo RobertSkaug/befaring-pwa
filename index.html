@@ -22,12 +22,14 @@
       </div>
     </div>
     <div class="actions">
+      <button class="btn" id="btnViewSaved" onclick="window.location.href='saved-inspections.html'">📋 Lagrede</button>
       <button class="btn" id="btnSave">Lagre</button>
       <button class="btn" id="btnLoad">Last</button>
       <button class="btn danger" id="btnReset">Nullstill</button>
       <button class="btn" id="btnExportPdf">Eksporter PDF</button>
       <button class="btn" id="btnShare">Send rapport</button>
       <button class="btn primary" id="btnExport">Eksporter Word</button>
+      <button class="btn" id="btnArchive">Arkiver befaring</button>
     </div>
   </div>
 </header>
@@ -63,6 +65,24 @@
   </section>
 
   <section class="card">
+    <h2>Rapportinfo</h2>
+    <div class="row">
+      <div>
+        <label>Befaringsdato</label>
+        <input id="inspectionDate" type="date" />
+      </div>
+      <div>
+        <label>Rapport utarbeidet av</label>
+        <input id="reportAuthor" placeholder="Navn" />
+      </div>
+    </div>
+
+    <h3 style="margin-top:14px;">Tilstede ved gjennomgang</h3>
+    <div id="attendees"></div>
+    <button class="btn" id="btnAddAttendee">+ Legg til person</button>
+  </section>
+
+  <section class="card">
     <div class="locHeader">
       <h2 style="margin:0;">Lokasjoner</h2>
       <button class="btn primary" id="btnAddLocation">+ Ny lokasjon</button>
@@ -74,10 +94,6 @@
       <div>
         <label>Adresse</label>
         <input id="address" placeholder="Velg fra forslag eller skriv manuelt" />
-      </div>
-      <div>
-        <label>Dato</label>
-        <input id="inspectionDate" type="date" />
       </div>
     </div>
 
