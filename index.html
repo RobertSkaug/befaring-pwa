@@ -35,6 +35,8 @@
       <button class="btn btn--tertiary" id="btnGoLocations" style="display:none;">Lokasjoner</button>
       <button class="btn btn--tertiary" id="btnGoFindings" style="display:none;">Avvik/Anbefaling</button>
       <button class="btn btn--tertiary" id="btnGoReport" style="display:none;">📄 Rapport</button>
+      <!-- Integrasjon: Mine befaringer-lenke -->
+      <a class="btn btn--tertiary" href="./mine-befaringer.html">Mine befaringer</a>
     </div>
   </div>
 </header>
@@ -50,6 +52,8 @@
         <button class="btn btn--tertiary" id="mBtnGoLocations" style="display:none;">Lokasjoner</button>
         <button class="btn btn--tertiary" id="mBtnGoFindings" style="display:none;">Avvik/Anbefaling</button>
         <button class="btn btn--tertiary" id="mBtnGoReport" style="display:none;">📄 Rapport</button>
+        <!-- Integrasjon: Mine befaringer-lenke -->
+        <a class="btn btn--tertiary" href="./mine-befaringer.html">Mine befaringer</a>
       </div>
     </div>
   </details>
@@ -420,5 +424,8 @@
 <script src="./thumbnailGrid.js"></script>
 <script src="./src/config/materials.js"></script>
 <script src="./app.js"></script>
+<!-- Integrasjon: lagring/gjenoppta befaringer (isolerte hooks) -->
+<script src="./src/storage/inspectionsStore.js"></script>
+<script src="./src/storage/inspectionsHooks.js"></script>
 </body>
 </html>
