@@ -44,15 +44,16 @@
     });
   }
 
-  document.querySelectorAll("[data-save-draft]").forEach(btn => {
-    btn.addEventListener("click", () => {
+  const saveBtn = document.getElementById("btnSaveDraft");
+  if(saveBtn){
+    saveBtn.addEventListener("click", () => {
       try {
         if(hasCustomer(window.state)){
           store.saveDraftManual(window.state);
         }
       } catch {}
     });
-  });
+  }
 
   const resumeStep = sessionStorage.getItem("befaringResumeStep");
   if(resumeStep && typeof window.showStep === "function"){
