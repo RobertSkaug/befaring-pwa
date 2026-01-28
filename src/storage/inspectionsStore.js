@@ -3,7 +3,6 @@
   const META_KEY = "befaringer_meta";
   const LEGACY_KEY = "befaringer";
   const ACTIVE_KEY = "befaringActiveId";
-  const SESSION_KEY = "befaringSessionDraft";
   const SNAPSHOT_FALLBACK_PREFIX = "befaringSnapshot:";
   const DB_NAME = "befaring-pwa";
   const STORE = "inspectionSnapshots";
@@ -178,24 +177,6 @@
     safeJson(() => localStorage.removeItem(`${SNAPSHOT_FALLBACK_PREFIX}${id}`), null);
   };
 
-  const saveSessionDraft = (snap, progressHint) => {
-    const payload = {
-      snapshot: snapshot(snap),
-      updatedAt: new Date().toISOString(),
-      title: getTitle(snap),
-      inspectionDate: getInspectionDate(snap),
-      progressHint: progressHint || detectStep()
-    };
-    safeJson(() => localStorage.setItem(SESSION_KEY, JSON.stringify(payload)), null);
-  };
-
-  const loadSessionDraft = () => safeJson(() => {
-    const raw = localStorage.getItem(SESSION_KEY);
-    return raw ? JSON.parse(raw) : null;
-  }, null);
-
-  const clearSessionDraft = () => safeJson(() => localStorage.removeItem(SESSION_KEY), null);
-
   const createDraft = async (initialSnapshot) => {
     if(!ENABLE_INSPECTION_STORAGE) return "";
     const id = genId();
@@ -264,7 +245,6 @@
     saveMeta(upsertMeta(list, meta));
     await saveSnapshot(id, snapshot(snap));
     setActiveId("");
-    clearSessionDraft();
   };
 
   const listSummaries = () => {
@@ -291,9 +271,6 @@
     saveDraft,
     markCompleted,
     listSummaries,
-    saveSessionDraft,
-    loadSessionDraft,
-    clearSessionDraft,
     load,
     remove,
     setActiveId,
