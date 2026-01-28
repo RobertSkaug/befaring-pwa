@@ -10,9 +10,19 @@
   };
 
   const sortByUpdated = (a,b) => (b.updatedAt || "").localeCompare(a.updatedAt || "");
-  const { drafts, completed } = store.listSummaries();
-  drafts.sort(sortByUpdated);
+  const { completed } = store.listSummaries();
   completed.sort(sortByUpdated);
+
+  const session = store.loadSessionDraft();
+  const drafts = session ? [{
+    id: "session",
+    status: "draft",
+    title: session.title,
+    updatedAt: session.updatedAt,
+    inspectionDate: session.inspectionDate || session.updatedAt,
+    progressHint: session.progressHint || "locations",
+    snapshot: session.snapshot
+  }] : [];
 
   const draftsEl = document.getElementById("draftList");
   const doneEl = document.getElementById("doneList");
@@ -48,12 +58,12 @@
     root.querySelectorAll("[data-resume]").forEach(btn => {
       btn.addEventListener("click", async () => {
         const id = btn.getAttribute("data-resume");
-        const snap = await store.load(id);
-        if(!snap) return;
         const item = items.find(x => x.id === id) || {};
+        const snap = item.snapshot || await store.load(id);
+        if(!snap) return;
         localStorage.setItem("befaringState", JSON.stringify(snap));
         sessionStorage.setItem("befaringResumeStep", item.progressHint || "locations");
-        store.setActiveId(id);
+        if(id !== "session") store.setActiveId(id);
         window.location.href = "./index.html";
       });
     });
@@ -74,7 +84,11 @@
     root.querySelectorAll("[data-delete]").forEach(btn => {
       btn.addEventListener("click", async () => {
         const id = btn.getAttribute("data-delete");
-        await store.remove(id);
+        if(id === "session"){
+          store.clearSessionDraft();
+        } else {
+          await store.remove(id);
+        }
         window.location.reload();
       });
     });

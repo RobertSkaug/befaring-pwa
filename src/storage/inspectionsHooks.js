@@ -30,38 +30,29 @@
     return Boolean(name || org);
   };
 
-  const ensureDraftId = async () => {
-    let id = store.getActiveId();
-    if(!id){
-      id = await store.createDraft(window.state);
-    }
-    return id;
-  };
-
-  const autoSave = async () => {
+  const saveSessionDraft = () => {
     try {
-      if(!hasCustomer(window.state)) return;
-      const id = await ensureDraftId();
-      if(id) await store.saveDraft(id, window.state);
+      store.saveSessionDraft(window.state);
     } catch {}
   };
-
-  wrapSync("saveBuild", () => autoSave());
   wrapAsync("exportToPDF", async () => {
     try {
-      const id = store.getActiveId();
+      let id = store.getActiveId();
+      if(!id) id = await store.createDraft(window.state);
       if(id) await store.markCompleted(id, window.state);
     } catch {}
   });
   wrapAsync("exportToWord", async () => {
     try {
-      const id = store.getActiveId();
+      let id = store.getActiveId();
+      if(!id) id = await store.createDraft(window.state);
       if(id) await store.markCompleted(id, window.state);
     } catch {}
   });
   wrapAsync("exportAndEmail", async () => {
     try {
-      const id = store.getActiveId();
+      let id = store.getActiveId();
+      if(!id) id = await store.createDraft(window.state);
       if(id) await store.markCompleted(id, window.state);
     } catch {}
   });
@@ -70,36 +61,16 @@
   if(startBtn){
     startBtn.addEventListener("click", () => {
       setTimeout(() => {
-        autoSave();
+        saveSessionDraft();
       }, 0);
     });
   }
 
-  const customerName = document.getElementById("customerName");
-  if(customerName){
-    customerName.addEventListener("input", () => {
-      try { autoSave(); } catch {}
-    });
-  }
-  const orgnr = document.getElementById("orgnr");
-  if(orgnr){
-    orgnr.addEventListener("input", () => {
-      try { autoSave(); } catch {}
-    });
-  }
-
-  document.addEventListener("input", () => {
-    autoSave();
-  }, true);
-  document.addEventListener("change", () => {
-    autoSave();
-  }, true);
-
   document.addEventListener("visibilitychange", () => {
-    if(document.visibilityState === "hidden") autoSave();
+    if(document.visibilityState === "hidden") saveSessionDraft();
   });
   window.addEventListener("beforeunload", () => {
-    autoSave();
+    saveSessionDraft();
   });
 
   const resumeStep = sessionStorage.getItem("befaringResumeStep");
