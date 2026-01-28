@@ -1,24 +1,16 @@
-const CACHE = "befaring-pwa-v29";
+const CACHE = "befaring-pwa-v10";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
-  "./buttons.css",
   "./app.js",
-  "./report.css",
-  "./report-print.css",
-  "./imageStore.js",
-  "./imageAnnotator.js",
-  "./imageCaptureFlow.js",
-  "./thumbnailGrid.js",
   "./manifest.webmanifest",
   "./icons/icon-192.png",
-  "./icons/icon-512.png",
-  "./icons/KLP_logo_koksgraa.png"
+  "./icons/icon-512.png"
 ];
 
 self.addEventListener("install", (event) => {
-  // IKKE skipWaiting her - vent på brukerens bekreftelse
+  self.skipWaiting();
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)));
 });
 
@@ -31,10 +23,4 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   event.respondWith(caches.match(event.request).then(cached => cached || fetch(event.request)));
-});
-
-self.addEventListener("message", (event) => {
-  if (event.data && event.data.type === "SKIP_WAITING") {
-    self.skipWaiting();
-  }
 });

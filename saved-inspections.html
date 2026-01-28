@@ -5,7 +5,6 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Lagrede befaringer</title>
   <link rel="stylesheet" href="./styles.css">
-  <link rel="stylesheet" href="./print.css">
   <style>
     .page { max-width: 1100px; margin: 16px auto; padding: 0 12px; }
     .filter-box { background:#fff; padding:16px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.08); margin-bottom:16px; }
@@ -27,9 +26,10 @@
   <header class="header">
     <div class="wrap header__bar">
       <div class="brand">
+        <div class="logo">B</div>
         <div>
-          <div class="t1">Befaring</div>
-          <div class="t2">Lagrede befaringer</div>
+          <div class="t1">Lagrede befaringer</div>
+          <div class="t2">Søk • Filtrer • Rediger</div>
         </div>
       </div>
       <div class="actions">
@@ -48,16 +48,6 @@
           <input id="search" placeholder="Kundenavn, adresse, orgnr" />
         </div>
         <div>
-          <label>Fra dato</label>
-          <input id="dateFrom" type="date" />
-        </div>
-        <div>
-          <label>Til dato</label>
-          <input id="dateTo" type="date" />
-        </div>
-      </div>
-      <div class="row">
-        <div>
           <label>KLP-deltaker</label>
           <select id="klpFilter">
             <option value="">Alle</option>
@@ -66,7 +56,7 @@
         <div>
           <label>Sortering</label>
           <select id="sortOrder">
-            <option value="customer" selected>Kunde (A-Å)</option>
+            <option value="customer">Kunde (A-Å)</option>
             <option value="customer-desc">Kunde (Å-A)</option>
             <option value="date-new">Dato (nyest først)</option>
             <option value="date-old">Dato (eldst først)</option>
@@ -75,17 +65,7 @@
       </div>
     </div>
 
-    <!-- Påbegynte befaringer -->
-    <div>
-      <h2 style="margin-top:20px; margin-bottom:12px;">📝 Påbegynte befaringer</h2>
-      <div class="list" id="listInProgress"></div>
-    </div>
-
-    <!-- Avsluttede befaringer -->
-    <div>
-      <h2 style="margin-top:20px; margin-bottom:12px;">✅ Avsluttede befaringer</h2>
-      <div class="list" id="listCompleted"></div>
-    </div>
+    <div class="list" id="list"></div>
   </main>
 
 <script>
@@ -111,14 +91,10 @@ function klpNames(list){
 
 function renderStats(list){
   const total = list.length;
-  const inProgress = list.filter(x => x.status !== 'avsluttet').length;
-  const completed = list.filter(x => x.status === 'avsluttet').length;
   const totalItems = list.reduce((s,x)=> s + (x.items?.length||0), 0);
   const klps = klpNames(list).length;
   document.getElementById('stats').innerHTML = `
     <div class="stat"><div class="num">${total}</div><div>befaringer</div></div>
-    <div class="stat"><div class="num">${inProgress}</div><div>påbegynte</div></div>
-    <div class="stat"><div class="num">${completed}</div><div>avsluttede</div></div>
     <div class="stat"><div class="num">${klps}</div><div>KLP-deltakere</div></div>
     <div class="stat"><div class="num">${totalItems}</div><div>registrerte punkt</div></div>
   `;
@@ -128,28 +104,13 @@ function applyFilters(list){
   const search = document.getElementById('search').value.toLowerCase();
   const klp = document.getElementById('klpFilter').value;
   const sort = document.getElementById('sortOrder').value;
-  const dateFrom = document.getElementById('dateFrom').value;
-  const dateTo = document.getElementById('dateTo').value;
 
   let res = list.filter(insp => {
     const addr = insp.locations?.[0]?.address || '';
-    const matchesSearch = !search ||
+    return (!search ||
       (insp.customer?.name||'').toLowerCase().includes(search) ||
       (insp.customer?.orgnr||'').includes(search) ||
-      addr.toLowerCase().includes(search);
-
-    // Datofiltring
-    const inspDate = insp.inspectionDate ? new Date(insp.inspectionDate) : null;
-    const fromDate = dateFrom ? new Date(dateFrom) : null;
-    const toDate = dateTo ? new Date(dateTo) : null;
-
-    let matchesDate = true;
-    if(inspDate){
-      if(fromDate && inspDate < fromDate) matchesDate = false;
-      if(toDate && inspDate > toDate) matchesDate = false;
-    }
-
-    return matchesSearch && matchesDate;
+      addr.toLowerCase().includes(search));
   });
 
   if(klp){
@@ -168,40 +129,31 @@ function applyFilters(list){
   return res;
 }
 
-function renderCard(insp){
-  const loc = insp.locations?.[0] || {};
-  const klpTags = (insp.attendees||[]).filter(a => (a.employer||'').toLowerCase().includes('klp'));
-  const status = insp.status === 'avsluttet' ? '✅ Avsluttet' : '📝 Påbegynt';
-  return `
-    <div class="card-row">
-      <h3>${esc(insp.customer?.name||'Ukjent kunde')}</h3>
-      <div class="muted">Dato: ${esc(insp.inspectionDate||'—')} • Org.nr: ${esc(insp.customer?.orgnr||'—')} • ${status}</div>
-      <div class="muted">Adresse: ${esc(loc.address||'—')}</div>
-      <div class="tags">
-        <span class="tag">Punkter: ${insp.items?.length||0}</span>
-        ${insp.reportAuthor ? `<span class="tag klp">${esc(insp.reportAuthor)}</span>` : ''}
-        ${klpTags.map(a=>`<span class="tag klp">${esc(a.name)}</span>`).join('')}
+function renderList(list){
+  const root = document.getElementById('list');
+  if(!list.length){ root.innerHTML = '<div class="card-row"><p class="muted">Ingen lagrede befaringer.</p></div>'; return; }
+
+  root.innerHTML = list.map(insp => {
+    const loc = insp.locations?.[0] || {};
+    const klpTags = (insp.attendees||[]).filter(a => (a.employer||'').toLowerCase().includes('klp'));
+    return `
+      <div class="card-row">
+        <h3>${esc(insp.customer?.name||'Ukjent kunde')}</h3>
+        <div class="muted">Dato: ${esc(insp.inspectionDate||'—')} • Org.nr: ${esc(insp.customer?.orgnr||'—')}</div>
+        <div class="muted">Adresse: ${esc(loc.address||'—')}</div>
+        <div class="tags">
+          <span class="tag">Punkter: ${insp.items?.length||0}</span>
+          ${insp.reportAuthor ? `<span class="tag klp">${esc(insp.reportAuthor)}</span>` : ''}
+          ${klpTags.map(a=>`<span class="tag klp">${esc(a.name)}</span>`).join('')}
+        </div>
+        <div class="actions">
+          <button class="btn small" onclick="viewInspection(${insp.id})">Vis</button>
+          <button class="btn small" onclick="editInspection(${insp.id})">Rediger</button>
+          <button class="btn danger small" onclick="deleteInspection(${insp.id})">Slett</button>
+        </div>
       </div>
-      <div class="actions">
-        <button class="btn small" onclick="viewInspection(${insp.id})">Vis rapport</button>
-        <button class="btn small" onclick="editInspection(${insp.id})">Rediger</button>
-        <button class="btn danger small" onclick="deleteInspection(${insp.id})">Slett</button>
-      </div>
-    </div>
-  `;
-}
-
-function renderLists(list){
-  const inProgressList = list.filter(x => x.status !== 'avsluttet');
-  const completedList = list.filter(x => x.status === 'avsluttet');
-
-  const renderContainer = (items) => {
-    if(!items.length) return '<div class="card-row"><p class="muted">Ingen befaringer i denne kategorien.</p></div>';
-    return items.map(renderCard).join('');
-  };
-
-  document.getElementById('listInProgress').innerHTML = renderContainer(inProgressList);
-  document.getElementById('listCompleted').innerHTML = renderContainer(completedList);
+    `;
+  }).join('');
 }
 
 function viewInspection(id){
@@ -229,13 +181,13 @@ function init(){
   const klps = klpNames(list);
   document.getElementById('klpFilter').innerHTML = '<option value="">Alle</option>' + klps.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
 
-  const rerender = ()=> renderLists(applyFilters(loadInspections()));
-  ['search','klpFilter','sortOrder','dateFrom','dateTo'].forEach(id=>{
+  const rerender = ()=> renderList(applyFilters(loadInspections()));
+  ['search','klpFilter','sortOrder'].forEach(id=>{
     document.getElementById(id).addEventListener('input', rerender);
     document.getElementById(id).addEventListener('change', rerender);
   });
 
-  renderLists(applyFilters(list));
+  renderList(applyFilters(list));
 }
 
 init();

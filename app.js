@@ -618,9 +618,7 @@ function saveFinalInspection(){
     locations: state.locations,
     activeLocationId: state.activeLocationId,
     items: state.items,
-    savedDate: new Date().toISOString(),
-    status: "avsluttet", // Status: "påbegynt" eller "avsluttet"
-    createdDate: isEditing ? (inspections.find(x=>x.id===id)?.createdDate || new Date().toISOString()) : new Date().toISOString()
+    savedDate: new Date().toISOString()
   };
 
   const idx = inspections.findIndex(x => x.id === id);
@@ -648,8 +646,7 @@ function loadInspectionForEditing(){
       customer: data.customer || { orgnr:"", name:"", orgForm:"", industry:"" },
       locations: data.locations || [ newLocation("LOC-1") ],
       activeLocationId: data.activeLocationId || (data.locations?.[0]?.id || "LOC-1"),
-      items: data.items || [],
-      status: data.status || "påbegynt"
+      items: data.items || []
     };
     normalizeState();
 
