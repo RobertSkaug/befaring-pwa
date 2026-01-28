@@ -241,6 +241,7 @@ function newBuilding(id){
     protectionMeasures: [], // [code]
     sprinklerLastCheck: "",
     sprinklerScore: "",
+    fireAlarmConnected: "",
     
     // LEGACY: Behold for bakoverkompatibilitet (migreres ved load)
     columns:[],
@@ -1223,6 +1224,7 @@ function renderProtectionMeasures(){
   }).filter(Boolean);
 
   const hasSprinkler = b.protectionMeasures.includes("S");
+  const hasFireAlarm = b.protectionMeasures.includes("A");
 
   const chips = PROTECTION.map(p => {
     const isActive = b.protectionMeasures.includes(p.code);
@@ -1235,6 +1237,9 @@ function renderProtectionMeasures(){
 
   const sprinklerText = hasSprinkler
     ? `Du har valgt: Sprinkleranlegg. Du kan også svare på dette.`
+    : "";
+  const fireAlarmText = hasFireAlarm
+    ? `Du har valgt: Brannalarmanlegg. Du kan også svare på dette.`
     : "";
 
   container.innerHTML = `
@@ -1265,6 +1270,21 @@ function renderProtectionMeasures(){
         <p class="muted" style="font-size:13px; margin-top:6px;">Mangler info? Se <a href="https://fgkontroll.no/" target="_blank" rel="noopener">fgkontroll.no</a>.</p>
       </div>
     ` : ""}
+    ${hasFireAlarm ? `
+      <div class="card" style="padding:12px; margin-top:10px;">
+        <div style="font-weight:600; margin-bottom:6px;">Brannalarmanlegg</div>
+        <p class="muted" style="font-size:13px; margin-top:0;">${esc(fireAlarmText)}</p>
+        <div>
+          <label>Er anlegget tilknyttet alarmsentral?</label>
+          <select id="fireAlarmConnected">
+            <option value="">Velg</option>
+            <option value="ja" ${b.fireAlarmConnected === "ja" ? "selected" : ""}>Ja</option>
+            <option value="nei" ${b.fireAlarmConnected === "nei" ? "selected" : ""}>Nei</option>
+            <option value="ukjent" ${b.fireAlarmConnected === "ukjent" ? "selected" : ""}>Ukjent</option>
+          </select>
+        </div>
+      </div>
+    ` : ""}
   `;
 
   container.querySelectorAll("[data-prot-code]").forEach(btn => {
@@ -1291,6 +1311,14 @@ function renderProtectionMeasures(){
   if(sprinklerScore){
     sprinklerScore.addEventListener("input", () => {
       b.sprinklerScore = sprinklerScore.value;
+      saveBuild();
+    });
+  }
+
+  const fireAlarmConnected = $("fireAlarmConnected");
+  if(fireAlarmConnected){
+    fireAlarmConnected.addEventListener("change", () => {
+      b.fireAlarmConnected = fireAlarmConnected.value;
       saveBuild();
     });
   }
@@ -2633,6 +2661,10 @@ function renderConstructionMaterialsReport(bld) {
         const score = bld.sprinklerScore || "—";
         html += `<p><em>Sprinkleranlegg:</em> Siste kontroll ${esc(date)} • Score ${esc(score)}</p>\n`;
       }
+      if(bld.protectionMeasures.includes("A")){
+        const conn = bld.fireAlarmConnected || "—";
+        html += `<p><em>Brannalarmanlegg:</em> Tilknyttet alarmsentral: ${esc(conn)}</p>\n`;
+      }
     }
   } else {
     if (hasLegacyPerPart) {
@@ -2674,6 +2706,10 @@ function renderConstructionMaterialsReport(bld) {
         const date = bld.sprinklerLastCheck || "—";
         const score = bld.sprinklerScore || "—";
         html += `<p><em>Sprinkleranlegg:</em> Siste kontroll ${esc(date)} • Score ${esc(score)}</p>\n`;
+      }
+      if (bld.protection.includes("A")) {
+        const conn = bld.fireAlarmConnected || "—";
+        html += `<p><em>Brannalarmanlegg:</em> Tilknyttet alarmsentral: ${esc(conn)}</p>\n`;
       }
     }
   }
