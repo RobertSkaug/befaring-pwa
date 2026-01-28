@@ -1736,7 +1736,7 @@ async function addFinding(){
   const buildingHeading = (b?.label || "").trim()
     || (b?.buildingNo ? `Bygningsnr ${b.buildingNo}` : "Bygg");
 
-  const type = $("findingType").value;
+  const type = ("" + $("findingType").value).trim().toUpperCase();
   const severity = $("findingSeverity").value;
   const dueDate = $("findingDue").value;
   const title = ($("findingTitle").value || "").trim();
@@ -1994,7 +1994,7 @@ ${matProtHtml}
   });
   
   // Kapittel 2: Avvik (MED bilder)
-  const avvikList = state.findings.filter(f => (f.type || "").toUpperCase() === "AVVIK");
+  const avvikList = state.findings.filter(f => (String(f.type || "").trim().toLowerCase() === "avvik"));
   let avvikSection = "";
   for (const [idx, f] of avvikList.entries()) {
     const num = idx + 1;
@@ -2059,7 +2059,7 @@ ${matProtHtml}
   }
   
   // Kapittel 3: Anbefalinger (MED bilder)
-  const anbList = state.findings.filter(f => (f.type || "").toUpperCase() === "ANBEFALING");
+  const anbList = state.findings.filter(f => (String(f.type || "").trim().toLowerCase() === "anbefaling"));
   let anbSection = "";
   for (const [idx, f] of anbList.entries()) {
     const num = idx + 1;
@@ -2848,7 +2848,7 @@ ${matProtHtml}
   });
   
   // Kapittel 2: Avvik (MED bilder)
-  const avvikList = state.findings.filter(f => (f.type || "").toUpperCase() === "AVVIK");
+  const avvikList = state.findings.filter(f => (String(f.type || "").trim().toLowerCase() === "avvik"));
   let avvikSection = "";
   for (const [idx, f] of avvikList.entries()) {
     const num = idx + 1;
@@ -2914,7 +2914,7 @@ ${matProtHtml}
   }
   
   // Kapittel 3: Anbefalinger (MED bilder)
-  const anbList = state.findings.filter(f => (f.type || "").toUpperCase() === "ANBEFALING");
+  const anbList = state.findings.filter(f => (String(f.type || "").trim().toLowerCase() === "anbefaling"));
   let anbSection = "";
   for (const [idx, f] of anbList.entries()) {
     const num = idx + 1;
