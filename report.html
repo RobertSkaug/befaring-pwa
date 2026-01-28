@@ -1,0 +1,224 @@
+<!doctype html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Befaringsrapport</title>
+  <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./print.css">
+  <style>
+    .report-header { background:#fff; padding:20px 0; border-bottom:2px solid #eee; margin-bottom:20px; }
+    .report-meta { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-top:12px; }
+    .meta-item { }
+    .meta-label { color:#666; font-size:12px; font-weight:600; margin-bottom:4px; display:block; }
+    .meta-value { font-size:16px; font-weight:600; }
+    .section-header { background:#f8f9fa; border-left:4px solid var(--p); padding:12px 14px; margin:24px 0 12px; font-weight:700; }
+    .attendees-grid { display:grid; grid-template-columns:repeat(auto-fit, minmax(200px, 1fr)); gap:12px; margin:12px 0; }
+    .attendee-card { background:#fff; border:1px solid #eee; border-radius:8px; padding:12px; }
+    .attendee-name { font-weight:600; }
+    .attendee-detail { color:#666; font-size:13px; margin:2px 0; }
+    .location-block { background:#fff; border:1px solid #eee; border-radius:8px; padding:16px; margin:12px 0; }
+    .location-title { font-size:18px; font-weight:700; margin-bottom:12px; }
+    .location-info { display:grid; grid-template-columns:1fr 1fr; gap:16px; margin-bottom:16px; }
+    .items-list { }
+    .item-card { background:#fff; border:1px solid #eee; border-radius:8px; padding:14px; margin:12px 0; }
+    .item-header { display:flex; gap:8px; align-items:center; margin-bottom:8px; }
+    .item-title { font-weight:700; font-size:16px; flex:1; }
+    .item-meta { display:flex; gap:12px; flex-wrap:wrap; font-size:13px; color:#666; margin:8px 0; }
+    .item-meta span { display:flex; gap:4px; align-items:center; }
+    .item-desc { color:#333; margin:10px 0; line-height:1.5; }
+    .photos-grid { display:grid; grid-template-columns:repeat(auto-fill, minmax(200px, 1fr)); gap:12px; margin:12px 0; }
+    .photo-item { }
+    .photo-img { width:100%; aspect-ratio:1; object-fit:cover; border-radius:8px; border:1px solid #eee; }
+    .photo-comment { font-size:12px; color:#666; margin-top:6px; padding:8px; background:#f8f9fa; border-radius:6px; }
+    .actions-bar { position:sticky; bottom:0; background:#fff; border-top:1px solid #eee; padding:12px 0; margin-top:20px; display:flex; gap:10px; flex-wrap:wrap; }
+    .badge-status { display:inline-block; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600; }
+    .badge-avvik { background:#fce4ec; color:#c2185b; }
+    .badge-anb { background:#e0f2f1; color:#00897b; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="wrap header__bar">
+      <div class="brand">
+        <div class="logo">B</div>
+        <div>
+          <div class="t1">Befaringsrapport</div>
+          <div class="t2">Lesemodus</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn" id="btnBack">← Tilbake</button>
+        <button class="btn" id="btnPrint">🖨️ Skriv ut / PDF</button>
+        <button class="btn primary" id="btnEdit">✏️ Rediger</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="wrap">
+    <div class="report-header">
+      <h1 id="reportTitle">Befaringsrapport</h1>
+      <div class="report-meta">
+        <div>
+          <span class="meta-label">Kundenavn</span>
+          <div class="meta-value" id="customerName">—</div>
+        </div>
+        <div>
+          <span class="meta-label">Org.nr</span>
+          <div class="meta-value" id="customerOrgnr">—</div>
+        </div>
+        <div>
+          <span class="meta-label">Befaringsdato</span>
+          <div class="meta-value" id="inspectionDate">—</div>
+        </div>
+        <div>
+          <span class="meta-label">Rapport av</span>
+          <div class="meta-value" id="reportAuthor">—</div>
+        </div>
+      </div>
+    </div>
+
+    <!-- Attendees -->
+    <div id="attendeesSection"></div>
+
+    <!-- Locations and Items -->
+    <div id="locationsSection"></div>
+
+    <div class="actions-bar">
+      <button class="btn" onclick="window.location.href='saved-inspections.html'">← Lagrede befaringer</button>
+      <button class="btn" id="btnPrint2">🖨️ Skriv ut / PDF</button>
+      <button class="btn primary" id="btnEdit2">✏️ Rediger</button>
+    </div>
+  </main>
+
+<script>
+function esc(s){ return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c])); }
+
+let reportData = null;
+
+function loadReport(){
+  const raw = sessionStorage.getItem('reportPayload');
+  if(!raw){ alert('Ingen rapport å vise.'); window.location.href = 'saved-inspections.html'; return; }
+  try {
+    reportData = JSON.parse(raw);
+  } catch(e) {
+    alert('Feil ved lasting av rapport.');
+    window.location.href = 'saved-inspections.html';
+  }
+}
+
+function renderReport(){
+  if(!reportData) return;
+
+  // Header info
+  document.getElementById('customerName').textContent = reportData.customer?.name || '—';
+  document.getElementById('customerOrgnr').textContent = reportData.customer?.orgnr || '—';
+  document.getElementById('inspectionDate').textContent = reportData.inspectionDate || '—';
+  document.getElementById('reportAuthor').textContent = reportData.reportAuthor || '—';
+
+  // Attendees
+  const attendeesSection = document.getElementById('attendeesSection');
+  if(reportData.attendees && reportData.attendees.length > 0){
+    attendeesSection.innerHTML = `
+      <div class="section-header">👥 Tilstede ved gjennomgang</div>
+      <div class="attendees-grid">
+        ${(reportData.attendees||[]).map(a => `
+          <div class="attendee-card">
+            <div class="attendee-name">${esc(a.name||'—')}</div>
+            <div class="attendee-detail">${esc(a.title||'—')}</div>
+            <div class="attendee-detail">${esc(a.employer||'—')}</div>
+          </div>
+        `).join('')}
+      </div>
+    `;
+  } else {
+    attendeesSection.innerHTML = '';
+  }
+
+  // Locations and items
+  const locSection = document.getElementById('locationsSection');
+  locSection.innerHTML = (reportData.locations||[]).map((loc, locIdx) => {
+    const items = (reportData.items||[]).filter(it => it.locationId === loc.id);
+    const avvik = items.filter(it => it.type === 'AVVIK');
+    const anb = items.filter(it => it.type === 'ANBEFALING');
+
+    const renderItem = (item) => `
+      <div class="item-card">
+        <div class="item-header">
+          <span class="badge-status ${item.type === 'AVVIK' ? 'badge-avvik' : 'badge-anb'}">
+            ${item.type === 'AVVIK' ? 'AVVIK' : 'ANBEFALING'}
+          </span>
+          <span class="item-title">${esc(item.title)}</span>
+        </div>
+        <div class="item-meta">
+          <span>Ref.nr: ${esc(item.refNo)}</span>
+          ${item.type === 'AVVIK' && item.severity ? `<span>Alvorlighet: ${esc(item.severity)}</span>` : ''}
+          ${item.type === 'AVVIK' && item.dueDate ? `<span>Frist: ${esc(item.dueDate)}</span>` : ''}
+        </div>
+        ${item.desc ? `<div class="item-desc">${esc(item.desc).replaceAll("\n","<br>")}</div>` : ''}
+        ${(item.photos||[]).length > 0 ? `
+          <div class="photos-grid">
+            ${item.photos.map(p => `
+              <div class="photo-item">
+                <img src="${p.dataUrl}" class="photo-img" alt="Bilde">
+                ${p.comment ? `<div class="photo-comment">${esc(p.comment)}</div>` : ''}
+              </div>
+            `).join('')}
+          </div>
+        ` : ''}
+      </div>
+    `;
+
+    return `
+      <div class="location-block">
+        <div class="location-title">📍 Lokasjon ${locIdx + 1}</div>
+        <div class="location-info">
+          <div>
+            <span class="meta-label">Adresse</span>
+            <div>${esc(loc.address || '—')}</div>
+          </div>
+          <div>
+            <span class="meta-label">GPS</span>
+            <div>${loc.geo?.lat && loc.geo?.lng 
+              ? `${loc.geo.lat.toFixed(5)}, ${loc.geo.lng.toFixed(5)} (±${Math.round(loc.geo.accuracy||0)}m)` 
+              : '—'}</div>
+          </div>
+        </div>
+
+        <h3 style="margin:16px 0 10px; font-size:15px; font-weight:700;">Avvik (${avvik.length})</h3>
+        ${avvik.length ? avvik.map(renderItem).join('') : '<p class="muted">Ingen avvik.</p>'}
+
+        <h3 style="margin:16px 0 10px; font-size:15px; font-weight:700;">Anbefalinger (${anb.length})</h3>
+        ${anb.length ? anb.map(renderItem).join('') : '<p class="muted">Ingen anbefalinger.</p>'}
+      </div>
+    `;
+  }).join('');
+}
+
+function editReport(){
+  if(!reportData) return;
+  sessionStorage.setItem('editingInspection', JSON.stringify(reportData));
+  window.location.href = 'index.html';
+}
+
+function printReport(){
+  window.print();
+}
+
+function init(){
+  loadReport();
+  renderReport();
+
+  document.getElementById('btnBack').addEventListener('click', () => window.location.href = 'saved-inspections.html');
+  document.getElementById('btnPrint').addEventListener('click', printReport);
+  document.getElementById('btnEdit').addEventListener('click', editReport);
+  document.getElementById('btnPrint2').addEventListener('click', printReport);
+  document.getElementById('btnEdit2').addEventListener('click', editReport);
+
+  sessionStorage.removeItem('reportPayload');
+}
+
+init();
+</script>
+</body>
+</html>

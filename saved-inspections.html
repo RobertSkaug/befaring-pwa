@@ -5,6 +5,7 @@
   <meta name="viewport" content="width=device-width, initial-scale=1" />
   <title>Lagrede befaringer</title>
   <link rel="stylesheet" href="./styles.css">
+  <link rel="stylesheet" href="./print.css">
   <style>
     .page { max-width: 1100px; margin: 16px auto; padding: 0 12px; }
     .filter-box { background:#fff; padding:16px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.08); margin-bottom:16px; }
@@ -65,7 +66,17 @@
       </div>
     </div>
 
-    <div class="list" id="list"></div>
+    <!-- Påbegynte befaringer -->
+    <div>
+      <h2 style="margin-top:20px; margin-bottom:12px;">📝 Påbegynte befaringer</h2>
+      <div class="list" id="listInProgress"></div>
+    </div>
+
+    <!-- Avsluttede befaringer -->
+    <div>
+      <h2 style="margin-top:20px; margin-bottom:12px;">✅ Avsluttede befaringer</h2>
+      <div class="list" id="listCompleted"></div>
+    </div>
   </main>
 
 <script>
@@ -91,10 +102,14 @@ function klpNames(list){
 
 function renderStats(list){
   const total = list.length;
+  const inProgress = list.filter(x => x.status !== 'avsluttet').length;
+  const completed = list.filter(x => x.status === 'avsluttet').length;
   const totalItems = list.reduce((s,x)=> s + (x.items?.length||0), 0);
   const klps = klpNames(list).length;
   document.getElementById('stats').innerHTML = `
     <div class="stat"><div class="num">${total}</div><div>befaringer</div></div>
+    <div class="stat"><div class="num">${inProgress}</div><div>påbegynte</div></div>
+    <div class="stat"><div class="num">${completed}</div><div>avsluttede</div></div>
     <div class="stat"><div class="num">${klps}</div><div>KLP-deltakere</div></div>
     <div class="stat"><div class="num">${totalItems}</div><div>registrerte punkt</div></div>
   `;
@@ -129,31 +144,40 @@ function applyFilters(list){
   return res;
 }
 
-function renderList(list){
-  const root = document.getElementById('list');
-  if(!list.length){ root.innerHTML = '<div class="card-row"><p class="muted">Ingen lagrede befaringer.</p></div>'; return; }
-
-  root.innerHTML = list.map(insp => {
-    const loc = insp.locations?.[0] || {};
-    const klpTags = (insp.attendees||[]).filter(a => (a.employer||'').toLowerCase().includes('klp'));
-    return `
-      <div class="card-row">
-        <h3>${esc(insp.customer?.name||'Ukjent kunde')}</h3>
-        <div class="muted">Dato: ${esc(insp.inspectionDate||'—')} • Org.nr: ${esc(insp.customer?.orgnr||'—')}</div>
-        <div class="muted">Adresse: ${esc(loc.address||'—')}</div>
-        <div class="tags">
-          <span class="tag">Punkter: ${insp.items?.length||0}</span>
-          ${insp.reportAuthor ? `<span class="tag klp">${esc(insp.reportAuthor)}</span>` : ''}
-          ${klpTags.map(a=>`<span class="tag klp">${esc(a.name)}</span>`).join('')}
-        </div>
-        <div class="actions">
-          <button class="btn small" onclick="viewInspection(${insp.id})">Vis</button>
-          <button class="btn small" onclick="editInspection(${insp.id})">Rediger</button>
-          <button class="btn danger small" onclick="deleteInspection(${insp.id})">Slett</button>
-        </div>
+function renderCard(insp){
+  const loc = insp.locations?.[0] || {};
+  const klpTags = (insp.attendees||[]).filter(a => (a.employer||'').toLowerCase().includes('klp'));
+  const status = insp.status === 'avsluttet' ? '✅ Avsluttet' : '📝 Påbegynt';
+  return `
+    <div class="card-row">
+      <h3>${esc(insp.customer?.name||'Ukjent kunde')}</h3>
+      <div class="muted">Dato: ${esc(insp.inspectionDate||'—')} • Org.nr: ${esc(insp.customer?.orgnr||'—')} • ${status}</div>
+      <div class="muted">Adresse: ${esc(loc.address||'—')}</div>
+      <div class="tags">
+        <span class="tag">Punkter: ${insp.items?.length||0}</span>
+        ${insp.reportAuthor ? `<span class="tag klp">${esc(insp.reportAuthor)}</span>` : ''}
+        ${klpTags.map(a=>`<span class="tag klp">${esc(a.name)}</span>`).join('')}
       </div>
-    `;
-  }).join('');
+      <div class="actions">
+        <button class="btn small" onclick="viewInspection(${insp.id})">Vis rapport</button>
+        <button class="btn small" onclick="editInspection(${insp.id})">Rediger</button>
+        <button class="btn danger small" onclick="deleteInspection(${insp.id})">Slett</button>
+      </div>
+    </div>
+  `;
+}
+
+function renderLists(list){
+  const inProgressList = list.filter(x => x.status !== 'avsluttet');
+  const completedList = list.filter(x => x.status === 'avsluttet');
+
+  const renderContainer = (items) => {
+    if(!items.length) return '<div class="card-row"><p class="muted">Ingen befaringer i denne kategorien.</p></div>';
+    return items.map(renderCard).join('');
+  };
+
+  document.getElementById('listInProgress').innerHTML = renderContainer(inProgressList);
+  document.getElementById('listCompleted').innerHTML = renderContainer(completedList);
 }
 
 function viewInspection(id){
@@ -181,13 +205,13 @@ function init(){
   const klps = klpNames(list);
   document.getElementById('klpFilter').innerHTML = '<option value="">Alle</option>' + klps.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
 
-  const rerender = ()=> renderList(applyFilters(loadInspections()));
+  const rerender = ()=> renderLists(applyFilters(loadInspections()));
   ['search','klpFilter','sortOrder'].forEach(id=>{
     document.getElementById(id).addEventListener('input', rerender);
     document.getElementById(id).addEventListener('change', rerender);
   });
 
-  renderList(applyFilters(list));
+  renderLists(applyFilters(list));
 }
 
 init();

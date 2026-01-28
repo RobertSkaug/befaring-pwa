@@ -1,0 +1,52 @@
+/* Print styling for reports */
+
+@media print {
+  body {
+    background: white;
+  }
+
+  .header,
+  .actions,
+  .actions-bar {
+    display: none !important;
+  }
+
+  main {
+    padding: 0;
+  }
+
+  .wrap {
+    max-width: 100%;
+  }
+
+  .report-header {
+    border: none;
+    page-break-after: avoid;
+  }
+
+  .section-header {
+    page-break-after: avoid;
+  }
+
+  .location-block {
+    page-break-inside: avoid;
+    border: 1px solid #ddd;
+  }
+
+  .item-card {
+    page-break-inside: avoid;
+  }
+
+  .photos-grid img {
+    page-break-inside: avoid;
+    max-width: 100%;
+  }
+
+  h1, h2, h3, h4 {
+    page-break-after: avoid;
+  }
+
+  .attendee-card {
+    page-break-inside: avoid;
+  }
+}
