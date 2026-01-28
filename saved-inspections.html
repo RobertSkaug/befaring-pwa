@@ -49,6 +49,16 @@
           <input id="search" placeholder="Kundenavn, adresse, orgnr" />
         </div>
         <div>
+          <label>Fra dato</label>
+          <input id="dateFrom" type="date" />
+        </div>
+        <div>
+          <label>Til dato</label>
+          <input id="dateTo" type="date" />
+        </div>
+      </div>
+      <div class="row">
+        <div>
           <label>KLP-deltaker</label>
           <select id="klpFilter">
             <option value="">Alle</option>
@@ -57,7 +67,7 @@
         <div>
           <label>Sortering</label>
           <select id="sortOrder">
-            <option value="customer">Kunde (A-Å)</option>
+            <option value="customer" selected>Kunde (A-Å)</option>
             <option value="customer-desc">Kunde (Å-A)</option>
             <option value="date-new">Dato (nyest først)</option>
             <option value="date-old">Dato (eldst først)</option>
@@ -119,13 +129,28 @@ function applyFilters(list){
   const search = document.getElementById('search').value.toLowerCase();
   const klp = document.getElementById('klpFilter').value;
   const sort = document.getElementById('sortOrder').value;
+  const dateFrom = document.getElementById('dateFrom').value;
+  const dateTo = document.getElementById('dateTo').value;
 
   let res = list.filter(insp => {
     const addr = insp.locations?.[0]?.address || '';
-    return (!search ||
+    const matchesSearch = !search ||
       (insp.customer?.name||'').toLowerCase().includes(search) ||
       (insp.customer?.orgnr||'').includes(search) ||
-      addr.toLowerCase().includes(search));
+      addr.toLowerCase().includes(search);
+
+    // Datofiltring
+    const inspDate = insp.inspectionDate ? new Date(insp.inspectionDate) : null;
+    const fromDate = dateFrom ? new Date(dateFrom) : null;
+    const toDate = dateTo ? new Date(dateTo) : null;
+
+    let matchesDate = true;
+    if(inspDate){
+      if(fromDate && inspDate < fromDate) matchesDate = false;
+      if(toDate && inspDate > toDate) matchesDate = false;
+    }
+
+    return matchesSearch && matchesDate;
   });
 
   if(klp){
@@ -206,7 +231,7 @@ function init(){
   document.getElementById('klpFilter').innerHTML = '<option value="">Alle</option>' + klps.map(n=>`<option value="${esc(n)}">${esc(n)}</option>`).join('');
 
   const rerender = ()=> renderLists(applyFilters(loadInspections()));
-  ['search','klpFilter','sortOrder'].forEach(id=>{
+  ['search','klpFilter','sortOrder','dateFrom','dateTo'].forEach(id=>{
     document.getElementById(id).addEventListener('input', rerender);
     document.getElementById(id).addEventListener('change', rerender);
   });
