@@ -1236,10 +1236,10 @@ function renderProtectionMeasures(){
   }).join("");
 
   const sprinklerText = hasSprinkler
-    ? `Du har valgt: Sprinkleranlegg. Du kan også svare på dette.`
+    ? `Du har valgt: Sprinkleranlegg.`
     : "";
   const fireAlarmText = hasFireAlarm
-    ? `Du har valgt: Brannalarmanlegg. Du kan også svare på dette.`
+    ? `Du har valgt: Brannalarmanlegg.`
     : "";
 
   container.innerHTML = `
