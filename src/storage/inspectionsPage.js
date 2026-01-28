@@ -9,15 +9,16 @@
     return d.toLocaleDateString("nb-NO", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" });
   };
 
-  const sortByUpdated = (a,b) => (b.updatedAt || "").localeCompare(a.updatedAt || "");
-  const { drafts, completed } = store.listSummaries();
-  drafts.sort(sortByUpdated);
-  completed.sort(sortByUpdated);
+  const byStatus = (list, status) => list.filter(x => x.status === status)
+    .sort((a,b) => (b.sistOppdatert || "").localeCompare(a.sistOppdatert || ""));
+
+  const draftList = byStatus(store.listAll(), "påbegynt");
+  const doneList = byStatus(store.listAll(), "avsluttet");
 
   const draftsEl = document.getElementById("draftList");
   const doneEl = document.getElementById("doneList");
 
-  const renderList = (items, root, emptyText, opts) => {
+  const renderList = (items, root, emptyText, withResume) => {
     if(!root) return;
     if(items.length === 0){
       root.innerHTML = `<p class="muted">${emptyText}</p>`;
@@ -29,55 +30,27 @@
         <div class="card" style="padding:12px; margin-bottom:10px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
             <div>
-              <div style="font-weight:600;">${item.title || "Befaring"}</div>
-              <div class="muted" style="font-size:13px;">Sist oppdatert: ${formatDate(item.updatedAt)}</div>
+              <div style="font-weight:600;">${item.tittel || "Befaring"}</div>
+              <div class="muted" style="font-size:13px;">Sist oppdatert: ${formatDate(item.sistOppdatert)}</div>
             </div>
-            <div style="display:flex; gap:8px;">
-              ${opts.resume ? `<button class="btn btn--primary" data-resume="${item.id}">Fortsett</button>` : ""}
-              ${opts.open ? `<button class="btn btn--secondary" data-open="${item.id}">Åpne</button>` : ""}
-              ${opts.delete ? `<button class="btn btn--tertiary" data-delete="${item.id}">Slett</button>` : ""}
-            </div>
+            ${withResume ? `<button class="btn btn--primary" data-resume="${item.id}">Fortsett</button>` : ""}
           </div>
           <div class="muted" style="font-size:13px; margin-top:8px;">Status: ${item.status}</div>
         </div>
       `;
     }).join("");
 
-    root.querySelectorAll("[data-resume]").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const id = btn.getAttribute("data-resume");
-        const snap = await store.load(id);
-        if(snap){
-          localStorage.setItem("befaringState", JSON.stringify(snap));
-          sessionStorage.setItem("befaringResumeStep", "locations");
-          store.setActiveId(id);
-          window.location.href = "./index.html";
-        }
+    if(withResume){
+      root.querySelectorAll("[data-resume]").forEach(btn => {
+        btn.addEventListener("click", () => {
+          const id = btn.getAttribute("data-resume");
+          const ok = store.resume(id);
+          if(ok) window.location.href = "./index.html";
+        });
       });
-    });
-
-    root.querySelectorAll("[data-open]").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const id = btn.getAttribute("data-open");
-        const snap = await store.load(id);
-        if(snap){
-          localStorage.setItem("befaringState", JSON.stringify(snap));
-          sessionStorage.setItem("befaringResumeStep", "report");
-          store.setActiveId(id);
-          window.location.href = "./index.html";
-        }
-      });
-    });
-
-    root.querySelectorAll("[data-delete]").forEach(btn => {
-      btn.addEventListener("click", async () => {
-        const id = btn.getAttribute("data-delete");
-        await store.remove(id);
-        window.location.reload();
-      });
-    });
+    }
   };
 
-  renderList(drafts, draftsEl, "Ingen påbegynte befaringer", { resume:true, delete:true });
-  renderList(completed, doneEl, "Ingen avsluttede befaringer", { open:true });
+  renderList(draftList, draftsEl, "Ingen påbegynte befaringer", true);
+  renderList(doneList, doneEl, "Ingen avsluttede befaringer", false);
 })();
