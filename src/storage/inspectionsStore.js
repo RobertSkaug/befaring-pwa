@@ -60,11 +60,13 @@
     return list;
   };
 
-  const saveDraftInternal = (state, step, ignoreThrottle) => {
+  const saveDraft = (state) => {
     if(!ENABLE_INSPECTION_STORAGE) return;
+    const step = detectStep();
+    if(step === "landing") return;
 
     const now = Date.now();
-    if(!ignoreThrottle && now - lastSaveAt < THROTTLE_MS) return;
+    if(now - lastSaveAt < THROTTLE_MS) return;
     lastSaveAt = now;
 
     const id = getActiveId() || genId();
@@ -83,17 +85,6 @@
 
     saveAll(upsert(list, item));
     setActiveId(id);
-  };
-
-  const saveDraft = (state) => {
-    const step = detectStep();
-    if(step === "landing") return;
-    saveDraftInternal(state, step, false);
-  };
-
-  const saveDraftManual = (state) => {
-    const step = detectStep();
-    saveDraftInternal(state, step || "landing", true);
   };
 
   const markCompleted = (state) => {
@@ -132,7 +123,6 @@
   window.InspectionsStore = {
     ENABLE_INSPECTION_STORAGE,
     saveDraft,
-    saveDraftManual,
     markCompleted,
     listAll,
     getById,
