@@ -274,25 +274,9 @@ function init(){
   $("todayLabel").textContent = `Risikogjennomgang • ${formatDateNo(state.inspectionDate)}`;
 
   // Navigation buttons
-  const bindClick = (id, handler) => {
-    const el = $(id);
-    if(el) el.addEventListener("click", handler);
-  };
-
-  bindClick("btnBackToLanding", () => showStep("landing"));
-  bindClick("btnGoLocations", () => showStep("locations"));
-  bindClick("btnGoFindings", () => showStep("findings"));
-  bindClick("btnGoReport", () => showStep("report"));
-
-  // Dropdown/menu navigation
-  bindClick("navBtnBackToLanding", () => showStep("landing"));
-  bindClick("navBtnGoLocations", () => showStep("locations"));
-  bindClick("navBtnGoFindings", () => showStep("findings"));
-  bindClick("navBtnGoReport", () => showStep("report"));
-  bindClick("navBtnViewSaved", () => window.location.href = "saved-inspections.html");
-
-  // Saved inspections (top/mobile)
-  bindClick("mBtnViewSaved", () => window.location.href = "saved-inspections.html");
+  $("btnBackToLanding").addEventListener("click", () => showStep("landing"));
+  $("btnGoLocations").addEventListener("click", () => showStep("locations"));
+  $("btnGoFindings").addEventListener("click", () => showStep("findings"));
 
   $("btnStartInspection").addEventListener("click", () => {
     showStep("locations");
@@ -300,12 +284,13 @@ function init(){
 
   $("btnToFindings").addEventListener("click", () => showStep("findings"));
   $("btnBackToLocations").addEventListener("click", () => showStep("locations"));
+  $("btnGoReport").addEventListener("click", () => showStep("report"));
 
     // Mobilmeny: same actions
-    bindClick("mBtnBackToLanding", () => showStep("landing"));
-    bindClick("mBtnGoLocations", () => showStep("locations"));
-    bindClick("mBtnGoFindings", () => showStep("findings"));
-    bindClick("mBtnGoReport", () => showStep("report"));
+    $("mBtnBackToLanding").addEventListener("click", () => showStep("landing"));
+    $("mBtnGoLocations").addEventListener("click", () => showStep("locations"));
+    $("mBtnGoFindings").addEventListener("click", () => showStep("findings"));
+    $("mBtnGoReport").addEventListener("click", () => showStep("report"));
 
   // Eksport-knapper
   $("btnExportPDF").addEventListener("click", exportToPDF);
