@@ -1,7 +1,12 @@
 (function(){
   const ENABLE_INSPECTION_STORAGE = true;
-  const STORAGE_KEY = "befaringer";
+  const META_KEY = "befaringer_meta";
   const ACTIVE_KEY = "befaringActiveId";
+  const SNAPSHOT_FALLBACK_PREFIX = "befaringSnapshot:";
+  const DB_NAME = "befaring-pwa";
+  const STORE = "inspectionSnapshots";
+  const VERSION = 1;
+  const META_VERSION = "v1";
   const THROTTLE_MS = 3000;
   let lastSaveAt = 0;
 
@@ -9,16 +14,55 @@
     try { return fn(); } catch { return fallback; }
   };
 
-  const loadAll = () => {
-    return safeJson(() => {
-      const raw = localStorage.getItem(STORAGE_KEY);
-      const data = raw ? JSON.parse(raw) : [];
-      return Array.isArray(data) ? data : [];
-    }, []);
+  const openDb = () => new Promise((resolve, reject) => {
+    if(!("indexedDB" in window)) return reject();
+    const req = indexedDB.open(DB_NAME, VERSION);
+    req.onupgradeneeded = () => {
+      const db = req.result;
+      if(!db.objectStoreNames.contains(STORE)) db.createObjectStore(STORE);
+    };
+    req.onsuccess = () => resolve(req.result);
+    req.onerror = () => reject(req.error);
+  });
+
+  const idbPut = async (key, value) => {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).put(value, key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
   };
 
-  const saveAll = (list) => {
-    safeJson(() => localStorage.setItem(STORAGE_KEY, JSON.stringify(list)), null);
+  const idbGet = async (key) => {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readonly");
+      const req = tx.objectStore(STORE).get(key);
+      req.onsuccess = () => resolve(req.result || null);
+      req.onerror = () => reject(req.error);
+    });
+  };
+
+  const idbDelete = async (key) => {
+    const db = await openDb();
+    return new Promise((resolve, reject) => {
+      const tx = db.transaction(STORE, "readwrite");
+      tx.objectStore(STORE).delete(key);
+      tx.oncomplete = () => resolve(true);
+      tx.onerror = () => reject(tx.error);
+    });
+  };
+
+  const loadMeta = () => safeJson(() => {
+    const raw = localStorage.getItem(META_KEY);
+    const data = raw ? JSON.parse(raw) : [];
+    return Array.isArray(data) ? data : [];
+  }, []);
+
+  const saveMeta = (list) => {
+    safeJson(() => localStorage.setItem(META_KEY, JSON.stringify(list)), null);
   };
 
   const getActiveId = () => safeJson(() => localStorage.getItem(ACTIVE_KEY), "");
@@ -55,90 +99,133 @@
     return "landing";
   };
 
-  const upsert = (list, item) => {
+  const upsertMeta = (list, item) => {
     const idx = list.findIndex(x => x.id === item.id);
     if(idx >= 0) list[idx] = item;
     else list.unshift(item);
     return list;
   };
 
-  const saveDraftInternal = (state, step, ignoreThrottle) => {
-    if(!ENABLE_INSPECTION_STORAGE) return;
+  const saveSnapshot = async (id, snap) => {
+    try {
+      await idbPut(id, snap);
+      safeJson(() => localStorage.removeItem(`${SNAPSHOT_FALLBACK_PREFIX}${id}`), null);
+      return true;
+    } catch {
+      safeJson(() => localStorage.setItem(`${SNAPSHOT_FALLBACK_PREFIX}${id}`, JSON.stringify(snap)), null);
+      return false;
+    }
+  };
 
-    const now = Date.now();
-    if(!ignoreThrottle && now - lastSaveAt < THROTTLE_MS) return;
-    lastSaveAt = now;
+  const loadSnapshot = async (id) => {
+    try {
+      const fromIdb = await idbGet(id);
+      if(fromIdb) return fromIdb;
+    } catch {}
+    return safeJson(() => {
+      const raw = localStorage.getItem(`${SNAPSHOT_FALLBACK_PREFIX}${id}`);
+      return raw ? JSON.parse(raw) : null;
+    }, null);
+  };
 
-    const id = getActiveId() || genId();
-    const list = loadAll();
-    const existing = list.find(x => x.id === id);
-    if(existing && existing.status === "avsluttet") return;
+  const removeSnapshot = async (id) => {
+    try { await idbDelete(id); } catch {}
+    safeJson(() => localStorage.removeItem(`${SNAPSHOT_FALLBACK_PREFIX}${id}`), null);
+  };
 
-    const item = {
+  const createDraft = async (initialSnapshot) => {
+    if(!ENABLE_INSPECTION_STORAGE) return "";
+    const id = genId();
+    const now = new Date().toISOString();
+    const meta = {
       id,
-      status: "påbegynt",
-      tittel: getTitle(state),
-      sistOppdatert: new Date().toISOString(),
-      lastStep: step,
-      data: snapshot(state)
+      status: "draft",
+      title: getTitle(initialSnapshot),
+      updatedAt: now,
+      createdAt: now,
+      progressHint: detectStep(),
+      version: META_VERSION
     };
 
-    saveAll(upsert(list, item));
+    saveMeta(upsertMeta(loadMeta(), meta));
+    await saveSnapshot(id, snapshot(initialSnapshot));
     setActiveId(id);
+    return id;
   };
 
-  const saveDraft = (state) => {
-    const step = detectStep();
-    if(step === "landing") return;
-    saveDraftInternal(state, step, false);
-  };
-
-  const saveDraftManual = (state) => {
-    const step = detectStep();
-    saveDraftInternal(state, step || "landing", true);
-  };
-
-  const markCompleted = (state) => {
+  const saveDraft = async (id, snap) => {
     if(!ENABLE_INSPECTION_STORAGE) return;
-    const id = getActiveId();
     if(!id) return;
-    const list = loadAll();
+
+    const now = Date.now();
+    if(now - lastSaveAt < THROTTLE_MS) return;
+    lastSaveAt = now;
+
+    const list = loadMeta();
+    const existing = list.find(x => x.id === id);
+    if(existing && existing.status === "completed") return;
+
+    const meta = {
+      id,
+      status: "draft",
+      title: getTitle(snap),
+      updatedAt: new Date().toISOString(),
+      createdAt: existing?.createdAt || new Date().toISOString(),
+      progressHint: detectStep(),
+      version: META_VERSION
+    };
+
+    saveMeta(upsertMeta(list, meta));
+    await saveSnapshot(id, snapshot(snap));
+  };
+
+  const markCompleted = async (id, snap) => {
+    if(!ENABLE_INSPECTION_STORAGE) return;
+    if(!id) return;
+    const list = loadMeta();
     const existing = list.find(x => x.id === id);
     if(!existing) return;
 
-    const item = {
+    const meta = {
       ...existing,
-      status: "avsluttet",
-      tittel: getTitle(state || existing.data),
-      sistOppdatert: new Date().toISOString(),
-      lastStep: existing.lastStep || "report",
-      data: snapshot(state || existing.data)
+      status: "completed",
+      title: getTitle(snap || existing.title),
+      updatedAt: new Date().toISOString(),
+      progressHint: existing.progressHint || "report",
+      version: META_VERSION
     };
 
-    saveAll(upsert(list, item));
+    saveMeta(upsertMeta(list, meta));
+    await saveSnapshot(id, snapshot(snap));
     setActiveId("");
   };
 
-  const listAll = () => loadAll();
-  const getById = (id) => loadAll().find(x => x.id === id);
+  const listSummaries = () => {
+    const list = loadMeta();
+    return {
+      drafts: list.filter(x => x.status === "draft"),
+      completed: list.filter(x => x.status === "completed")
+    };
+  };
 
-  const resume = (id) => {
-    const item = getById(id);
-    if(!item || !item.data) return false;
-    safeJson(() => localStorage.setItem("befaringState", JSON.stringify(item.data)), null);
-    sessionStorage.setItem("befaringResumeStep", item.lastStep || "locations");
-    setActiveId(id);
-    return true;
+  const load = async (id) => loadSnapshot(id);
+
+  const remove = async (id) => {
+    if(!id) return;
+    const list = loadMeta().filter(x => x.id !== id);
+    saveMeta(list);
+    await removeSnapshot(id);
+    if(getActiveId() === id) setActiveId("");
   };
 
   window.InspectionsStore = {
     ENABLE_INSPECTION_STORAGE,
+    createDraft,
     saveDraft,
-    saveDraftManual,
     markCompleted,
-    listAll,
-    getById,
-    resume,
+    listSummaries,
+    load,
+    remove,
     setActiveId,
     getActiveId
   };
