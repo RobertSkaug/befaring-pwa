@@ -1233,6 +1233,10 @@ function renderProtectionMeasures(){
     `;
   }).join("");
 
+  const sprinklerText = hasSprinkler
+    ? `Du har valgt: Sprinkleranlegg. Du kan også svare på dette.`
+    : "";
+
   container.innerHTML = `
     <details class="card" style="padding:12px;">
       <summary style="display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer;">
@@ -1243,8 +1247,11 @@ function renderProtectionMeasures(){
       <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;">
         ${chips}
       </div>
-
-      <div style="margin-top:12px; ${hasSprinkler ? "" : "display:none;"}" data-sprinkler-fields>
+    </details>
+    ${hasSprinkler ? `
+      <div class="card" style="padding:12px; margin-top:10px;">
+        <div style="font-weight:600; margin-bottom:6px;">Sprinkleranlegg</div>
+        <p class="muted" style="font-size:13px; margin-top:0;">${esc(sprinklerText)}</p>
         <div class="grid" style="gap:10px;">
           <div>
             <label>Siste kontroll (dato)</label>
@@ -1257,7 +1264,7 @@ function renderProtectionMeasures(){
         </div>
         <p class="muted" style="font-size:13px; margin-top:6px;">Mangler info? Se <a href="https://fgkontroll.no/" target="_blank" rel="noopener">fgkontroll.no</a>.</p>
       </div>
-    </details>
+    ` : ""}
   `;
 
   container.querySelectorAll("[data-prot-code]").forEach(btn => {
