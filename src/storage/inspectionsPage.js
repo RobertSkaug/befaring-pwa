@@ -25,14 +25,12 @@
     }
 
     root.innerHTML = items.map(item => {
-      const dateText = item.inspectionDate || item.updatedAt || "";
       return `
         <div class="card" style="padding:12px; margin-bottom:10px;">
           <div style="display:flex; align-items:center; justify-content:space-between; gap:10px;">
             <div>
               <div style="font-weight:600;">${item.title || "Befaring"}</div>
-              <div class="muted" style="font-size:13px;">Dato: ${formatDate(dateText)}</div>
-              <div class="muted" style="font-size:12px;">Sist oppdatert: ${formatDate(item.updatedAt)}</div>
+              <div class="muted" style="font-size:13px;">Sist oppdatert: ${formatDate(item.updatedAt)}</div>
             </div>
             <div style="display:flex; gap:8px;">
               ${opts.resume ? `<button class="btn btn--primary" data-resume="${item.id}">Fortsett</button>` : ""}
