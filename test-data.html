@@ -1,0 +1,77 @@
+<!DOCTYPE html>
+<html lang="nb">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Test Data - Befaring</title>
+  <link rel="stylesheet" href="styles.css">
+</head>
+<body>
+  <header>
+    <h1>Test Data Generator</h1>
+  </header>
+
+  <div style="max-width: 800px; margin: 0 auto; padding: 2rem;">
+    <div class="card">
+      <h2>Generer testdata for lagrede befaringer</h2>
+      <p>Legger til eksempelbefaringer (ny state med flere lokasjoner og deltakere).</p>
+      <button class="btn primary" onclick="generateTestData()">Generer testdata</button>
+      <button class="btn danger" onclick="clearData()">Slett all data</button>
+      <button class="btn" onclick="window.location.href='saved-inspections.html'">Gå til lagrede befaringer</button>
+      <div id="status" style="margin-top: 1rem; padding: 1rem; border-radius: 4px; display: none;"></div>
+    </div>
+  </div>
+
+  <script>
+    function generateTestData() {
+      const loc = (addr) => ({ id: `LOC-${Math.random().toString(16).slice(2,6)}`, address: addr, geo:{lat:null,lng:null,accuracy:null,ts:null} });
+      const make = (n, idx) => ({
+        id: Date.now() - idx*100000,
+        inspectionDate: `2025-01-${10+idx}`,
+        reportAuthor: n.author,
+        attendees: n.attendees,
+        customer: n.customer,
+        locations: [ loc(n.address) ],
+        activeLocationId: null,
+        items: n.items,
+        savedDate: new Date(Date.now() - idx*100000).toISOString()
+      });
+
+      const tests = [
+        make({
+          customer:{ orgnr:"123456789", name:"Acme Bygg AS", orgForm:"AS", industry:"41.200" },
+          address:"Karl Johans gate 1, Oslo",
+          author:"Ola Nordmann",
+          attendees:[{name:"Ola Nordmann", title:"Rådgiver", employer:"KLP"}, {name:"Kari Jensen", title:"Prosjektleder", employer:"Acme"}],
+          items:[{ id:"IT-1", locationId:"LOC-1", refNo:"L1-0001-0126", type:"AVVIK", severity:"Høy", dueDate:"2025-02-15", title:"Manglende brannslukker", desc:"Mangler slukker i 1. etasje", photos:[], createdAt:new Date().toISOString()}]
+        },1),
+        make({
+          customer:{ orgnr:"987654321", name:"Beta Eiendom AS", orgForm:"AS", industry:"68.200" },
+          address:"Bryggen 10, Bergen",
+          author:"Per Hansen",
+          attendees:[{name:"Per Hansen", title:"Seniorrådgiver", employer:"KLP"}],
+          items:[{ id:"IT-1", locationId:"LOC-1", refNo:"L1-0001-0126", type:"ANBEFALING", severity:null, dueDate:"", title:"Oppgradering ventilasjon", desc:"Anbefaler oppgradering", photos:[], createdAt:new Date().toISOString()}]
+        },2)
+      ];
+
+      localStorage.setItem('savedInspections', JSON.stringify(tests));
+      const statusEl = document.getElementById('status');
+      statusEl.style.display = 'block';
+      statusEl.style.background = '#d4edda';
+      statusEl.style.color = '#155724';
+      statusEl.innerHTML = `✓ Generert ${tests.length} test-befaringer!`;
+    }
+
+    function clearData() {
+      if (confirm('Er du sikker på at du vil slette alle lagrede befaringer?')) {
+        localStorage.removeItem('savedInspections');
+        const statusEl = document.getElementById('status');
+        statusEl.style.display = 'block';
+        statusEl.style.background = '#f8d7da';
+        statusEl.style.color = '#721c24';
+        statusEl.innerHTML = '✓ Alle lagrede befaringer er slettet.';
+      }
+    }
+  </script>
+</body>
+</html>
