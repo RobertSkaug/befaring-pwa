@@ -935,49 +935,46 @@ function renderActiveBuildingFields(){
   $("buildingNo").value = b.buildingNo || "";
   $("businessManual").value = "";
 
-  $("buildYear").value = b.buildYear || "";
-  $("areaM2").value = b.areaM2 || "";
-  $("floors").value = b.floors || "";
+  const isSelected = (code) => b.protectionMeasures.includes(code);
 
-  $("bDesc").value = b.description || "";
-  $("bSafety").value = b.safety || "";
-  $("bRisk").value = b.risk || "";
-
-  renderConstructionMaterials();
-  renderProtectionMeasures();
-  renderBusinessSelected();
-  renderAreaBreakdown();
-}
-
-function renderLocationTabs(){
-  const root = $("locTabs");
-  root.innerHTML = state.locations.map((l, idx) => {
-    const active = (l.id === state.activeLocationId) ? "active" : "";
+  const chips = PROTECTION.map(p => {
+    const active = isSelected(p.code);
     return `
-      <button class="locTab ${active}" data-loc="${esc(l.id)}">
-        <span class="locTab__label">${esc(shortLabel(l, idx))}</span>
-      </button>`;
+      <button type="button" class="construction-chip ${active ? "construction-chip--protection" : ""}" data-prot-code="${p.code}">
+        ${esc(p.label)}
+      </button>
+    `;
   }).join("");
 
-  root.querySelectorAll("[data-loc]").forEach(btn => {
-    btn.addEventListener("click", () => setActiveLocation(btn.getAttribute("data-loc")));
+  container.innerHTML = `
+    <details class="card" style="padding:12px;">
+      <summary style="display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer;">
+        <span style="font-weight:600;">Beskyttelse</span>
+        <span class="muted" style="font-size:12px;">${b.protectionMeasures.length ? `${b.protectionMeasures.length} valgt` : "Ingen valgt"}</span>
+      </summary>
+
+      <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;">
+        ${chips}
+      </div>
+
+      <div id="protectionExtraFields" style="margin-top:16px;"></div>
+    </details>
+  `;
+
+  renderProtectionExtraFields();
+
+  container.querySelectorAll("[data-prot-code]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const code = btn.getAttribute("data-prot-code");
+      if(isSelected(code)){
+        b.protectionMeasures = b.protectionMeasures.filter(x => x !== code);
+      } else {
+        b.protectionMeasures.push(code);
+      }
+      renderProtectionMeasures();
+      saveBuild();
+    });
   });
-}
-
-function renderActiveLocationFields(){
-  const loc = getActiveLocation();
-  $("objectName").value = loc.objectName || "";
-  $("address").value = loc.address || "";
-
-  if(loc.geo.lat && loc.geo.lng){
-    $("gpsStatus").textContent = `GPS: ${loc.geo.lat.toFixed(5)}, ${loc.geo.lng.toFixed(5)} (±${Math.round(loc.geo.accuracy||0)}m)`;
-  } else {
-    $("gpsStatus").textContent = "GPS: ikke hentet";
-  }
-
-  renderBuildingTabs();
-  renderActiveBuildingFields();
-
   renderAddressSuggestions([]);
   renderBusinessSuggestions([]);
   $("businessStatus").textContent = "";
