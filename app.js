@@ -3258,12 +3258,6 @@ async function suggestFromImage(){
     // Bruk annotert eller original versjon
     const base64 = img.hasAnnotations ? img.annotatedDataURL : img.originalDataURL;
     
-    if (!shouldUseAiBackend()) {
-      const fallback = await buildLocalSuggestion(currentFindingImageAssets);
-      applySuggestion(fallback, msgDiv, true);
-      return;
-    }
-
     // Kall backend (hvis tilgjengelig)
     const response = await fetch("/api/ai/avvik-forslag", {
       method: "POST",
@@ -3381,13 +3375,6 @@ function getImageStats(dataUrl){
     image.onerror = () => resolve({ avgLuma: 128, lumaVar: 0 });
     image.src = dataUrl;
   });
-}
-
-function shouldUseAiBackend(){
-  if (location.protocol === "file:") return false;
-  const host = location.hostname.toLowerCase();
-  if (host.endsWith("github.io") || host.endsWith("githubusercontent.com")) return false;
-  return true;
 }
 
 init();
