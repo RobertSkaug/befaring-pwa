@@ -1215,42 +1215,44 @@ function renderProtectionMeasures(){
 
   b.protectionMeasures = b.protectionMeasures || [];
 
-  const chips = b.protectionMeasures.map((entry, idx) => {
-    const code = typeof entry === 'string' ? entry : (entry?.code || entry?.label || "");
+  const labels = b.protectionMeasures.map(code => {
     const item = PROTECTION.find(p => p.code === code);
-    const label = item ? item.label : code;
-    return `<span class="construction-chip construction-chip--protection" data-prot-idx="${idx}">
-      ${esc(label)}
-      <button class="remove-btn" type="button">×</button>
-    </span>`;
-  }).join(" ");
+    return item ? item.label : code;
+  }).filter(Boolean);
+
+  const chips = PROTECTION.map(p => {
+    const isActive = b.protectionMeasures.includes(p.code);
+    return `
+      <button type="button" class="construction-chip ${isActive ? "construction-chip--protection" : ""}" data-prot-code="${p.code}">
+        ${esc(p.label)}
+      </button>
+    `;
+  }).join("");
 
   container.innerHTML = `
-    <div style="display:flex; flex-wrap:wrap; gap:8px;">
-      ${chips || '<span class="muted" style="font-size:13px;">Ingen beskyttelse registrert</span>'}
-      <button class="btn btn--sm" type="button" id="addProtectionBtn">+ Legg til</button>
-    </div>
+    <details class="card" style="padding:12px;">
+      <summary style="display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer;">
+        <span style="font-weight:600;">Beskyttelse</span>
+        <span class="muted" style="font-size:12px;">${esc(labels.join(", ") || "Ingen valgt")}</span>
+      </summary>
+
+      <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;">
+        ${chips}
+      </div>
+    </details>
   `;
 
-  const addBtn = $("addProtectionBtn");
-  if(addBtn){
-    addBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      openProtectionPicker();
+  container.querySelectorAll("[data-prot-code]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const code = btn.getAttribute("data-prot-code");
+      if(b.protectionMeasures.includes(code)){
+        b.protectionMeasures = b.protectionMeasures.filter(x => x !== code);
+      } else {
+        b.protectionMeasures.push(code);
+      }
+      renderProtectionMeasures();
+      saveBuild();
     });
-  }
-
-  container.querySelectorAll("[data-prot-idx]").forEach(chip => {
-    const removeBtn = chip.querySelector(".remove-btn");
-    if(removeBtn){
-      removeBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        const idx = Number(chip.getAttribute("data-prot-idx"));
-        b.protectionMeasures.splice(idx, 1);
-        renderProtectionMeasures();
-        saveBuild();
-      });
-    }
   });
 }
 
