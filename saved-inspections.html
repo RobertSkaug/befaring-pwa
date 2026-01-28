@@ -99,10 +99,32 @@ function saveInspections(list){
   localStorage.setItem('savedInspections', JSON.stringify(list));
 }
 
+function getAttendeesArray(insp){
+  if(Array.isArray(insp.attendees)) return insp.attendees;
+  const list = [];
+  const custName = insp.customer?.name || 'Kunde';
+  (insp.attendees?.klp || []).forEach(a => {
+    if(!a || (!a.name && !a.title)) return;
+    list.push({ name: a.name || '', title: a.title || '', employer: 'KLP' });
+  });
+  (insp.attendees?.customer || []).forEach(a => {
+    if(!a || (!a.name && !a.title)) return;
+    list.push({ name: a.name || '', title: a.title || '', employer: custName });
+  });
+  return list;
+}
+
+function getItemsCount(insp){
+  if(Array.isArray(insp.items)) return insp.items.length;
+  if(Array.isArray(insp.findings)) return insp.findings.length;
+  return 0;
+}
+
 function klpNames(list){
   const set = new Set();
   list.forEach(insp => {
-    (insp.attendees||[]).forEach(a => {
+    const attendees = getAttendeesArray(insp);
+    attendees.forEach(a => {
       if((a.employer||'').toLowerCase().includes('klp')) set.add(a.name||'');
     });
     if(insp.reportAuthor) set.add(insp.reportAuthor);
@@ -133,11 +155,14 @@ function applyFilters(list){
   const dateTo = document.getElementById('dateTo').value;
 
   let res = list.filter(insp => {
-    const addr = insp.locations?.[0]?.address || '';
+    const loc = insp.locations?.[0] || {};
+    const addr = loc.address || '';
+    const objName = loc.objectName || '';
     const matchesSearch = !search ||
       (insp.customer?.name||'').toLowerCase().includes(search) ||
       (insp.customer?.orgnr||'').includes(search) ||
-      addr.toLowerCase().includes(search);
+      addr.toLowerCase().includes(search) ||
+      objName.toLowerCase().includes(search);
 
     // Datofiltring
     const inspDate = insp.inspectionDate ? new Date(insp.inspectionDate) : null;
@@ -154,7 +179,7 @@ function applyFilters(list){
   });
 
   if(klp){
-    res = res.filter(insp => (insp.attendees||[]).some(a => a.name === klp && (a.employer||'').toLowerCase().includes('klp')) || insp.reportAuthor === klp);
+    res = res.filter(insp => getAttendeesArray(insp).some(a => a.name === klp && (a.employer||'').toLowerCase().includes('klp')) || insp.reportAuthor === klp);
   }
 
   res.sort((a,b)=>{
@@ -171,15 +196,17 @@ function applyFilters(list){
 
 function renderCard(insp){
   const loc = insp.locations?.[0] || {};
-  const klpTags = (insp.attendees||[]).filter(a => (a.employer||'').toLowerCase().includes('klp'));
-  const status = insp.status === 'avsluttet' ? '✅ Avsluttet' : '📝 Påbegynt';
+  const klpTags = getAttendeesArray(insp).filter(a => (a.employer||'').toLowerCase().includes('klp'));
+  const status = (insp.status || 'avsluttet') === 'avsluttet' ? '✅ Avsluttet' : '📝 Påbegynt';
+  const objectLabel = loc.objectName || '';
   return `
     <div class="card-row">
       <h3>${esc(insp.customer?.name||'Ukjent kunde')}</h3>
       <div class="muted">Dato: ${esc(insp.inspectionDate||'—')} • Org.nr: ${esc(insp.customer?.orgnr||'—')} • ${status}</div>
+      <div class="muted">Bygg: ${esc(objectLabel||'—')}</div>
       <div class="muted">Adresse: ${esc(loc.address||'—')}</div>
       <div class="tags">
-        <span class="tag">Punkter: ${insp.items?.length||0}</span>
+        <span class="tag">Punkter: ${getItemsCount(insp)}</span>
         ${insp.reportAuthor ? `<span class="tag klp">${esc(insp.reportAuthor)}</span>` : ''}
         ${klpTags.map(a=>`<span class="tag klp">${esc(a.name)}</span>`).join('')}
       </div>
