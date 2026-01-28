@@ -94,21 +94,6 @@
 <script>
 function esc(s){ return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c])); }
 
-function getAttendeesArray(data){
-  if(Array.isArray(data.attendees)) return data.attendees;
-  const list = [];
-  const custName = data.customer?.name || 'Kunde';
-  (data.attendees?.klp || []).forEach(a => {
-    if(!a || (!a.name && !a.title)) return;
-    list.push({ name: a.name || '', title: a.title || '', employer: 'KLP' });
-  });
-  (data.attendees?.customer || []).forEach(a => {
-    if(!a || (!a.name && !a.title)) return;
-    list.push({ name: a.name || '', title: a.title || '', employer: custName });
-  });
-  return list;
-}
-
 let reportData = null;
 
 function loadReport(){
@@ -133,12 +118,11 @@ function renderReport(){
 
   // Attendees
   const attendeesSection = document.getElementById('attendeesSection');
-  const attendeesList = getAttendeesArray(reportData);
-  if(attendeesList.length > 0){
+  if(reportData.attendees && reportData.attendees.length > 0){
     attendeesSection.innerHTML = `
       <div class="section-header">👥 Tilstede ved gjennomgang</div>
       <div class="attendees-grid">
-        ${attendeesList.map(a => `
+        ${(reportData.attendees||[]).map(a => `
           <div class="attendee-card">
             <div class="attendee-name">${esc(a.name||'—')}</div>
             <div class="attendee-detail">${esc(a.title||'—')}</div>
@@ -154,8 +138,7 @@ function renderReport(){
   // Locations and items
   const locSection = document.getElementById('locationsSection');
   locSection.innerHTML = (reportData.locations||[]).map((loc, locIdx) => {
-    const allItems = reportData.items || reportData.findings || [];
-    const items = allItems.filter(it => it.locationId === loc.id);
+    const items = (reportData.items||[]).filter(it => it.locationId === loc.id);
     const avvik = items.filter(it => it.type === 'AVVIK');
     const anb = items.filter(it => it.type === 'ANBEFALING');
 
