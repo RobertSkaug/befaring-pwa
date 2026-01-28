@@ -139,7 +139,46 @@
         "annet"
       ]
     },
-    
+    {
+      key: "brannseksjon",
+      label: "Brannseksjon",
+      materialOptions: [
+        "brannvegg-betong",
+        "brannvegg-murverk",
+        "gips-brann",
+        "brannmaling-staal",
+        "steinull-brannisolering",
+        "brannhimling",
+        "ukjent",
+        "annet"
+      ]
+    },
+    {
+      key: "aapninger",
+      label: "Åpninger (vinduer/dører/porter)",
+      materialOptions: [
+        "vindu-tre",
+        "vindu-alu",
+        "vindu-tre-alu",
+        "vindu-pvc",
+        "doer-tre",
+        "doer-staal",
+        "port-staal",
+        "port-sandwich",
+        "isolerglass-2-lags",
+        "isolerglass-3-lags",
+        "ukjent",
+        "annet"
+      ]
+    },
+    {
+      key: "annet",
+      label: "Annet",
+      materialOptions: [
+        "ukjent",
+        "annet"
+      ]
+    }
   ];
 
   const materialLabels = {
