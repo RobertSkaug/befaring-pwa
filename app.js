@@ -125,15 +125,109 @@ function getMaterialConfig(){
   }
 
   const buildingParts = [
-    { key: "fundament-grunn", label: "Fundament / grunn", materialOptions: ["plasstoep-betong","prefab-betong","ringmur","plate-paa-mark","peler-betong","peler-staal","peler-tre","naturstein","ukjent","annet"] },
-    { key: "soeyler", label: "Søyler", materialOptions: ["armert-betong","prefab-betong","staal-i-h-profil","staal-hulprofil","tre-limtre","tre-lvl","murverk-baerende","ukjent","annet"] },
-    { key: "bjelker", label: "Bjelker", materialOptions: ["staal-i-h-profil","staal-hulprofil","staal-fagverk","armert-betong","prefab-betong","tre-limtre","tre-i-bjelke","tre-lvl","samvirke-staal-betong","ukjent","annet"] },
-    { key: "dekke", label: "Dekke", materialOptions: ["plasstoep-betong","hulldekke","tt-element","massivdekke-betong","samvirkedekke-trapez-betong","trebjelkelag","massivtre-clt","lettbetong-porebetong","teknisk-gulv","ukjent","annet"] },
-    { key: "tak-baeresystem", label: "Tak bæresystem", materialOptions: ["takstoler-tre","sperrer-tre","tre-limtre","staal-rammer","staal-fagverk","betong-takelement","ukjent","annet"] },
-    { key: "tak-tekking", label: "Tak tekking", materialOptions: ["papp-bitumen","folie-pvc-tpo-epdm","profilplater-staal","metall-baandtekking","takstein-tegl","takstein-betong","skifer","groent-tak","ukjent","annet"] },
-    { key: "yttervegg-baeresystem", label: "Yttervegg bæresystem", materialOptions: ["tre-bindingsverk","betong","staal-skjelett","murverk-tegl","murverk-lettklinker","sandwich-betong","sandwich-staal","ukjent","annet"] },
-    { key: "yttervegg-fasade", label: "Yttervegg fasade", materialOptions: ["trepanel","tegl-forblending","puss","fasadeplater-fibersement","fasadeplater-hpl","metallkassetter","naturstein","glass-aluminium-fasade","ukjent","annet"] },
-    { key: "innvendig-stabilisering", label: "Innvendig stabilisering", materialOptions: ["betongkjerne","betong-avstivningsvegg","murverk","staal-kryssavstivning","massivtre-clt","ukjent","annet"] }
+    { key: "fundament-grunn", label: "Fundament / grunn", materialOptions: [
+      { code: "plasstoep-betong", label: "Plasstøpt betong" },
+      { code: "prefab-betong", label: "Prefab betong" },
+      { code: "ringmur", label: "Ringmur" },
+      { code: "plate-paa-mark", label: "Plate på mark" },
+      { code: "peler-betong", label: "Peler i betong" },
+      { code: "peler-staal", label: "Peler i stål" },
+      { code: "peler-tre", label: "Peler i tre" },
+      { code: "naturstein", label: "Naturstein" },
+      { code: "ukjent", label: "Ukjent" },
+      { code: "annet", label: "Annet" }
+    ] },
+    { key: "soeyler", label: "Søyler", materialOptions: [
+      { code: "armert-betong", label: "Armert betong" },
+      { code: "prefab-betong", label: "Prefab betong" },
+      { code: "staal-i-h-profil", label: "Stål i H-profil" },
+      { code: "staal-hulprofil", label: "Stål hulprofil" },
+      { code: "tre-limtre", label: "Tre – limtre" },
+      { code: "tre-lvl", label: "Tre – LVL" },
+      { code: "murverk-baerende", label: "Murverk (bærende)" },
+      { code: "ukjent", label: "Ukjent" },
+      { code: "annet", label: "Annet" }
+    ] },
+    { key: "bjelker", label: "Bjelker", materialOptions: [
+      { code: "staal-i-h-profil", label: "Stål i H-profil" },
+      { code: "staal-hulprofil", label: "Stål hulprofil" },
+      { code: "staal-fagverk", label: "Stål fagverk" },
+      { code: "armert-betong", label: "Armert betong" },
+      { code: "prefab-betong", label: "Prefab betong" },
+      { code: "tre-limtre", label: "Tre – limtre" },
+      { code: "tre-i-bjelke", label: "Tre i bjelke" },
+      { code: "tre-lvl", label: "Tre – LVL" },
+      { code: "samvirke-staal-betong", label: "Samvirke stål/betong" },
+      { code: "ukjent", label: "Ukjent" },
+      { code: "annet", label: "Annet" }
+    ] },
+    { key: "dekke", label: "Dekke", materialOptions: [
+      { code: "plasstoep-betong", label: "Plasstøpt betong" },
+      { code: "hulldekke", label: "Hulldekke" },
+      { code: "tt-element", label: "TT-element" },
+      { code: "massivdekke-betong", label: "Massivdekke (betong)" },
+      { code: "samvirkedekke-trapez-betong", label: "Samvirkedekke (trapez+betong)" },
+      { code: "trebjelkelag", label: "Trebjelkelag" },
+      { code: "massivtre-clt", label: "Massivtre (CLT)" },
+      { code: "lettbetong-porebetong", label: "Lettbetong / porebetong" },
+      { code: "teknisk-gulv", label: "Teknisk gulv" },
+      { code: "ukjent", label: "Ukjent" },
+      { code: "annet", label: "Annet" }
+    ] },
+    { key: "tak-baeresystem", label: "Tak bæresystem", materialOptions: [
+      { code: "takstoler-tre", label: "Takstoler (tre)" },
+      { code: "sperrer-tre", label: "Sperrer (tre)" },
+      { code: "tre-limtre", label: "Tre – limtre" },
+      { code: "staal-rammer", label: "Stålrammer" },
+      { code: "staal-fagverk", label: "Stål fagverk" },
+      { code: "betong-takelement", label: "Betong takelement" },
+      { code: "ukjent", label: "Ukjent" },
+      { code: "annet", label: "Annet" }
+    ] },
+    { key: "tak-tekking", label: "Tak tekking", materialOptions: [
+      { code: "papp-bitumen", label: "Papp/bitumen" },
+      { code: "folie-pvc-tpo-epdm", label: "Folie (PVC/TPO/EPDM)" },
+      { code: "profilplater-staal", label: "Profilplater (stål)" },
+      { code: "metall-baandtekking", label: "Metall båndtekking" },
+      { code: "takstein-tegl", label: "Takstein (tegl)" },
+      { code: "takstein-betong", label: "Takstein (betong)" },
+      { code: "skifer", label: "Skifer" },
+      { code: "groent-tak", label: "Grønt tak" },
+      { code: "ukjent", label: "Ukjent" },
+      { code: "annet", label: "Annet" }
+    ] },
+    { key: "yttervegg-baeresystem", label: "Yttervegg bæresystem", materialOptions: [
+      { code: "tre-bindingsverk", label: "Tre bindingsverk" },
+      { code: "betong", label: "Betong" },
+      { code: "staal-skjelett", label: "Stålskjelett" },
+      { code: "murverk-tegl", label: "Murverk (tegl)" },
+      { code: "murverk-lettklinker", label: "Murverk (lettklinker)" },
+      { code: "sandwich-betong", label: "Sandwich (betong)" },
+      { code: "sandwich-staal", label: "Sandwich (stål)" },
+      { code: "ukjent", label: "Ukjent" },
+      { code: "annet", label: "Annet" }
+    ] },
+    { key: "yttervegg-fasade", label: "Yttervegg fasade", materialOptions: [
+      { code: "trepanel", label: "Trepanel" },
+      { code: "tegl-forblending", label: "Teglforblending" },
+      { code: "puss", label: "Puss" },
+      { code: "fasadeplater-fibersement", label: "Fasadeplater (fibersement)" },
+      { code: "fasadeplater-hpl", label: "Fasadeplater (HPL)" },
+      { code: "metallkassetter", label: "Metallkassetter" },
+      { code: "naturstein", label: "Naturstein" },
+      { code: "glass-aluminium-fasade", label: "Glass/aluminium fasade" },
+      { code: "ukjent", label: "Ukjent" },
+      { code: "annet", label: "Annet" }
+    ] },
+    { key: "innvendig-stabilisering", label: "Innvendig stabilisering", materialOptions: [
+      { code: "betongkjerne", label: "Betongkjerne" },
+      { code: "betong-avstivningsvegg", label: "Betong avstivningsvegg" },
+      { code: "murverk", label: "Murverk" },
+      { code: "staal-kryssavstivning", label: "Stål kryssavstivning" },
+      { code: "massivtre-clt", label: "Massivtre (CLT)" },
+      { code: "ukjent", label: "Ukjent" },
+      { code: "annet", label: "Annet" }
+    ] }
   ];
 
   const materialLabels = {
@@ -198,14 +292,28 @@ function getMaterialConfig(){
 
   return { buildingParts, materialLabels };
 }
-const PROTECTION = [
-  { code:"S", label:"Sprinkleranlegg" },
-  { code:"A", label:"Brannalarmanlegg" },
-  { code:"I", label:"Innbruddsalarmanlegg" },
-  { code:"G", label:"Gasslokkeanlegg" },
-  { code:"R", label:"Røykventilasjon" },
-  { code:"D", label:"Delvis beskyttelse" }
-];
+
+function getProtectionConfig(){
+  if(window.ProtectionConfig && Array.isArray(window.ProtectionConfig.protectionOptions) && window.ProtectionConfig.protectionOptions.length){
+    return window.ProtectionConfig;
+  }
+
+  const protectionOptions = [
+    { code: "sprinkleranlegg", label: "Sprinkleranlegg (Automatisk slokkeanlegg)" },
+    { code: "brannalarmanlegg", label: "Brannalarmanlegg" },
+    { code: "innbruddsalarmanlegg", label: "Innbruddsalarmanlegg" },
+    { code: "gasslokkeanlegg", label: "Gasslokkeanlegg" },
+    { code: "roeykventilasjon", label: "Røykventilasjon" },
+    { code: "delvis-beskyttelse", label: "Delvis beskyttelse" }
+  ];
+
+  const protectionLabels = protectionOptions.reduce((acc, item) => {
+    acc[item.code] = item.label;
+    return acc;
+  }, {});
+
+  return { protectionOptions, protectionLabels };
+}
 
 const CONSTR_COL = [
   { code:"BETONG", label:"Betong" },
@@ -314,12 +422,11 @@ function newBuilding(id){
       yttervegg: []
     },
 
-    // Ny: Beskyttelse som egen seksjon (ikke knyttet til konstruksjon)
+    // Beskyttelse (ny modell)
+    protection: { selected: [], note: "" },
+
+    // LEGACY: tidligere beskyttelse (migreres ved load)
     protectionMeasures: [], // [code]
-    protectionDetails: {
-      sprinkler: { hasReport: false, reportDate: "", score: "" },
-      alarm: { connectedToCentral: false }
-    },
     
     // LEGACY: Behold for bakoverkompatibilitet (migreres ved load)
     columns:[],
@@ -328,7 +435,6 @@ function newBuilding(id){
     roof:[],
     outerWall:[],
     legacyMaterials:[],
-    protection:[],
     
     description:"",
     safety:"",
@@ -614,6 +720,9 @@ function migrateConstructionData(){
       if(!b.constructionMaterials){
         b.constructionMaterials = { soyler: [], bjelker: [], dekk: [], tak: [], yttervegg: [] };
       }
+      if(!b.protection) b.protection = { selected: [], note: "" };
+      if(!Array.isArray(b.protection.selected)) b.protection.selected = [];
+      if(typeof b.protection.note !== "string") b.protection.note = "";
       if(!b.protectionMeasures) b.protectionMeasures = [];
 
       // Normaliser protectionMeasures til koder (ikke objekter)
@@ -637,7 +746,7 @@ function migrateConstructionData(){
         if(!newPartKey) return;
 
         ensurePart(newPartKey);
-        const allowed = (parts.find(p => p.key === newPartKey)?.materialOptions) || [];
+        const allowed = (parts.find(p => p.key === newPartKey)?.materialOptions || []).map(opt => opt.code);
         const arr = b.constructionMaterials[partId] || [];
 
         arr.forEach(item => {
@@ -661,7 +770,7 @@ function migrateConstructionData(){
       if(legacyArray.length > 0){
         const targetKey = "yttervegg-baeresystem";
         ensurePart(targetKey);
-        const allowed = (parts.find(p => p.key === targetKey)?.materialOptions) || [];
+        const allowed = (parts.find(p => p.key === targetKey)?.materialOptions || []).map(opt => opt.code);
         legacyArray.forEach(code => {
           const label = LEGACY_MATERIALS.find(x => x.code === code)?.label || code;
           const mapped = findCodeByLabel(label, allowed);
@@ -674,12 +783,46 @@ function migrateConstructionData(){
         });
       }
 
-      // Migrer legacy protection -> protectionMeasures
-      if(b.protection && b.protection.length > 0){
-        b.protection.forEach(code => {
-          const prot = PROTECTION.find(x => x.code === code);
-          if(prot) pushProtUnique(b.protectionMeasures, code);
-        });
+      // Migrer legacy protection -> ny protection.selected
+      const protectionConfig = getProtectionConfig();
+      const codeMap = {
+        S: "sprinkleranlegg",
+        A: "brannalarmanlegg",
+        I: "innbruddsalarmanlegg",
+        G: "gasslokkeanlegg",
+        R: "roeykventilasjon",
+        D: "delvis-beskyttelse"
+      };
+
+      const addProtection = (codeOrLabel) => {
+        if(!codeOrLabel) return;
+        const direct = protectionConfig.protectionOptions.find(p => p.code === codeOrLabel);
+        if(direct){
+          pushProtUnique(b.protection.selected, direct.code);
+          return;
+        }
+        const mapped = codeMap[codeOrLabel];
+        if(mapped){
+          pushProtUnique(b.protection.selected, mapped);
+          return;
+        }
+        const lower = String(codeOrLabel).toLowerCase();
+        const byLabel = protectionConfig.protectionOptions.find(p => p.label.toLowerCase() === lower);
+        if(byLabel){
+          pushProtUnique(b.protection.selected, byLabel.code);
+          return;
+        }
+
+        const note = b.protection.note ? `${b.protection.note}\n` : "";
+        b.protection.note = `${note}Tidligere beskyttelse: ${codeOrLabel}`;
+      };
+
+      if(Array.isArray(b.protectionMeasures) && b.protectionMeasures.length > 0){
+        b.protectionMeasures.forEach(code => addProtection(code));
+      }
+
+      if(Array.isArray(b.protection) && b.protection.length > 0){
+        b.protection.forEach(code => addProtection(code));
       }
 
       // Sørg for at alle bygningsdeler finnes
@@ -865,49 +1008,33 @@ function hideBrregResults(){
   $("brregResults").style.display = "none";
   $("brregList").innerHTML = "";
 }
-function setBrregStatus(t){ $("brregStatus").textContent = t; }
 
-/* =========================
-   Attendees
-========================= */
 function renderAttendees(){
-  renderAttList("klpAttendees", state.attendees.klp, "klp");
-  renderAttList("customerAttendees", state.attendees.customer, "customer");
-}
+  const rootKlp = $("klpAttendees");
+  const rootCustomer = $("customerAttendees");
+  if(!rootKlp || !rootCustomer) return;
 
-function renderAttList(containerId, arr, group){
-  const root = $(containerId);
-  
-  // Velg tittel-liste og navn-liste basert på gruppe
-  const titleList = group === "klp" ? KLP_TITLES : CUSTOMER_TITLES;
-  const nameList = group === "klp" ? KLP_EMPLOYEES : null;
-  
-  root.innerHTML = arr.map((p, idx) => `
-    <div class="personRow">
-      <div>
-        <label>Navn</label>
-        ${group === "klp" 
-          ? `<select data-att-group="${group}" data-att-idx="${idx}" data-att-key="name">
-              <option value="">Velg navn</option>
-              ${nameList.map(n => `<option value="${esc(n)}" ${p.name === n ? "selected" : ""}>${esc(n)}</option>`).join("")}
-            </select>`
-          : `<input data-att-group="${group}" data-att-idx="${idx}" data-att-key="name" value="${esc(p.name)}" placeholder="Navn" />`
-        }
+  const renderGroup = (root, groupKey) => {
+    const list = state.attendees[groupKey] || [];
+    root.innerHTML = list.map((a, idx) => `
+      <div class="row" style="align-items:center;">
+        <div>
+          <input data-att-group="${groupKey}" data-att-idx="${idx}" data-att-key="name" placeholder="Navn" value="${esc(a.name || "")}">
+        </div>
+        <div>
+          <input data-att-group="${groupKey}" data-att-idx="${idx}" data-att-key="title" placeholder="Tittel" value="${esc(a.title || "")}">
+        </div>
+        <div style="display:flex; align-items:center;">
+          <button class="btn btn--icon" type="button" data-att-del="${groupKey}|${idx}">×</button>
+        </div>
       </div>
-      <div>
-        <label>Tittel</label>
-        <select data-att-group="${group}" data-att-idx="${idx}" data-att-key="title">
-          <option value="">Velg tittel</option>
-          ${titleList.map(t => `<option value="${esc(t)}" ${p.title === t ? "selected" : ""}>${esc(t)}</option>`).join("")}
-        </select>
-      </div>
-      <div>
-        <button class="btn btn--danger" data-att-del="${group}|${idx}">Slett</button>
-      </div>
-    </div>
-  `).join("");
+    `).join("");
+  };
 
-  root.querySelectorAll("input[data-att-key], select[data-att-key]").forEach(elem => {
+  renderGroup(rootKlp, "klp");
+  renderGroup(rootCustomer, "customer");
+
+  document.querySelectorAll("[data-att-group]").forEach(elem => {
     const eventType = elem.tagName === "INPUT" ? "input" : "change";
     elem.addEventListener(eventType, () => {
       const g = elem.getAttribute("data-att-group");
@@ -917,11 +1044,11 @@ function renderAttList(containerId, arr, group){
     });
   });
 
-  root.querySelectorAll("[data-att-del]").forEach(btn => {
+  document.querySelectorAll("[data-att-del]").forEach(btn => {
     btn.addEventListener("click", () => {
       const [g, iStr] = btn.getAttribute("data-att-del").split("|");
       const i = Number(iStr);
-      state.attendees[g].splice(i,1);
+      state.attendees[g].splice(i, 1);
       if(state.attendees[g].length === 0) state.attendees[g].push({ name:"", title:"" });
       renderAttendees();
     });
@@ -1158,11 +1285,13 @@ function renderConstructionMaterials(){
   const labelFor = (code) => config.materialLabels[code] || code;
 
   const chipsFor = (partKey, options, selected) => {
-    return options.map(code => {
+    return options.map(opt => {
+      const code = opt.code;
+      const label = opt.label || labelFor(code);
       const isActive = selected.includes(code);
       return `
         <button type="button" class="construction-chip ${isActive ? "construction-chip--material" : ""}" data-mat-part="${partKey}" data-mat-code="${code}">
-          ${esc(labelFor(code))}
+          ${esc(label)}
         </button>
       `;
     }).join("");
@@ -1266,183 +1395,60 @@ function renderProtectionMeasures(){
   const container = $("protectionChips");
   if(!container) return;
 
-  b.protectionMeasures = b.protectionMeasures || [];
+  if(!b.protection) b.protection = { selected: [], note: "" };
+  if(!Array.isArray(b.protection.selected)) b.protection.selected = [];
+  if(typeof b.protection.note !== "string") b.protection.note = "";
 
-  const chips = b.protectionMeasures.map((entry, idx) => {
-    const code = typeof entry === 'string' ? entry : (entry?.code || entry?.label || "");
-    const item = PROTECTION.find(p => p.code === code);
-    const label = item ? item.label : code;
-    return `<span class="construction-chip construction-chip--protection" data-prot-idx="${idx}">
-      ${esc(label)}
-      <button class="remove-btn" type="button">×</button>
-    </span>`;
-  }).join(" ");
+  const config = getProtectionConfig();
+  const isSelected = (code) => b.protection.selected.includes(code);
 
-  container.innerHTML = `
-    <div style="display:flex; flex-wrap:wrap; gap:8px;">
-      ${chips || '<span class="muted" style="font-size:13px;">Ingen beskyttelse registrert</span>'}
-      <button class="btn btn--sm" type="button" id="addProtectionBtn">+ Legg til</button>
-    </div>
-    <div id="protectionExtraFields" style="margin-top:16px;"></div>
-  `;
-
-  renderProtectionExtraFields();
-
-  const addBtn = $("addProtectionBtn");
-  if(addBtn){
-    addBtn.addEventListener("click", (e) => {
-      e.preventDefault();
-      openProtectionPicker();
-    });
-  }
-
-  container.querySelectorAll("[data-prot-idx]").forEach(chip => {
-    const removeBtn = chip.querySelector(".remove-btn");
-    if(removeBtn){
-      removeBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        const idx = Number(chip.getAttribute("data-prot-idx"));
-        b.protectionMeasures.splice(idx, 1);
-        renderProtectionMeasures();
-        saveBuild();
-      });
-    }
-  });
-}
-
-function renderProtectionExtraFields(){
-  const b = getActiveBuilding();
-  const container = $("protectionExtraFields");
-  if(!container) return;
-
-  b.protectionDetails = b.protectionDetails || {
-    sprinkler: { hasReport: false, reportDate: "", score: "" },
-    alarm: { connectedToCentral: false }
-  };
-
-  const hasSprinkler = b.protectionMeasures.includes("S");
-  const hasAlarm = b.protectionMeasures.includes("A");
-
-  let html = "";
-
-  if(hasSprinkler){
-    const checked = b.protectionDetails.sprinkler.hasReport ? "checked" : "";
-    const showDetails = b.protectionDetails.sprinkler.hasReport ? "" : "style='display:none;'";
-    html += `
-<div class="card" style="padding:12px; margin-bottom:12px; background:#f9f9f9;">
-  <h4 style="margin:0 0 10px; font-size:14px;">Sprinkleranlegg – Detaljer</h4>
-  <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-    <input type="checkbox" id="sprinklerHasReport" ${checked} style="width:auto;">
-    <span>Finnes det sprinklerrapport?</span>
-  </label>
-  <p class="muted" style="font-size:12px; margin:8px 0 0;">
-    Ikke tilgjengelig nå? Sjekk <a href="https://fgkontroll.no/" target="_blank" rel="noopener noreferrer" style="color:var(--klp-fjellgronn); text-decoration:underline;">FG Kontroll</a> for rapporter.
-  </p>
-  <div id="sprinklerDetails" ${showDetails} style="margin-top:12px;">
-    <div class="row">
-      <div>
-        <label>Når er den gjennomført sist?</label>
-        <input type="date" id="sprinklerReportDate" value="${esc(b.protectionDetails.sprinkler.reportDate || "")}">
-      </div>
-      <div>
-        <label>Hvilken score har anlegget fått? (1-10)</label>
-        <input type="number" id="sprinklerScore" min="1" max="10" value="${esc(b.protectionDetails.sprinkler.score || "")}" placeholder="1-10">
-      </div>
-    </div>
-  </div>
-</div>`;
-  }
-
-  if(hasAlarm){
-    const checked = b.protectionDetails.alarm.connectedToCentral ? "checked" : "";
-    html += `
-<div class="card" style="padding:12px; margin-bottom:12px; background:#f9f9f9;">
-  <h4 style="margin:0 0 10px; font-size:14px;">Brannalarmanlegg – Detaljer</h4>
-  <label style="display:flex; align-items:center; gap:8px; cursor:pointer;">
-    <input type="checkbox" id="alarmConnected" ${checked} style="width:auto;">
-    <span>Tilknyttet alarmsentral?</span>
-  </label>
-</div>`;
-  }
-
-  container.innerHTML = html;
-
-  // Event listeners
-  const sprinklerCheckbox = $("sprinklerHasReport");
-  if(sprinklerCheckbox){
-    sprinklerCheckbox.addEventListener("change", () => {
-      b.protectionDetails.sprinkler.hasReport = sprinklerCheckbox.checked;
-      const details = $("sprinklerDetails");
-      if(details) details.style.display = sprinklerCheckbox.checked ? "" : "none";
-      saveBuild();
-    });
-  }
-
-  const sprinklerDate = $("sprinklerReportDate");
-  if(sprinklerDate){
-    sprinklerDate.addEventListener("input", () => {
-      b.protectionDetails.sprinkler.reportDate = sprinklerDate.value;
-      saveBuild();
-    });
-  }
-
-  const sprinklerScore = $("sprinklerScore");
-  if(sprinklerScore){
-    sprinklerScore.addEventListener("input", () => {
-      b.protectionDetails.sprinkler.score = sprinklerScore.value;
-      saveBuild();
-    });
-  }
-
-  const alarmCheckbox = $("alarmConnected");
-  if(alarmCheckbox){
-    alarmCheckbox.addEventListener("change", () => {
-      b.protectionDetails.alarm.connectedToCentral = alarmCheckbox.checked;
-      saveBuild();
-    });
-  }
-}
-
-function openProtectionPicker(){
-  const b = getActiveBuilding();
-  b.protectionMeasures = b.protectionMeasures || [];
-
-  const pickerHtml = `
-<div class="modal-overlay" id="protectionPickerModal">
-  <div class="modal" style="max-width:520px;">
-    <div class="modal-header">
-      <h2>Legg til beskyttelse</h2>
-      <button class="btn-icon" id="closeProtectionPicker">✕</button>
-    </div>
-    <div class="modal-body">
-      <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:8px;" id="protectionPickerList"></div>
-    </div>
-  </div>
-</div>`;
-
-  document.body.insertAdjacentHTML("beforeend", pickerHtml);
-  const modal = $("protectionPickerModal");
-  const list = $("protectionPickerList");
-
-  list.innerHTML = PROTECTION.map(p => {
-    return `<button class="btn btn--sm" style="background:var(--klp-lys-fjellgronn); border-color:var(--klp-fjellgronn); color:var(--klp-svart);" data-select-prot="${p.code}">${esc(p.label)}</button>`;
+  const chips = (config.protectionOptions || []).map(p => {
+    const active = isSelected(p.code);
+    return `
+      <button type="button" class="construction-chip ${active ? "construction-chip--protection" : ""}" data-prot-code="${p.code}">
+        ${esc(p.label)}
+      </button>
+    `;
   }).join("");
 
-  $("closeProtectionPicker").addEventListener("click", () => modal.remove());
-  modal.addEventListener("click", (e) => {
-    if(e.target === modal) modal.remove();
-  });
+  container.innerHTML = `
+    <details class="card" style="padding:12px;">
+      <summary style="display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer;">
+        <span style="font-weight:600;">Beskyttelse</span>
+        <span class="muted" style="font-size:12px;">${b.protection.selected.length ? `${b.protection.selected.length} valgt` : "Ingen valgt"}</span>
+      </summary>
 
-  list.querySelectorAll("[data-select-prot]").forEach(btn => {
+      <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;">
+        ${chips}
+      </div>
+
+      <div style="margin-top:10px;">
+        <label>Kommentar</label>
+        <textarea data-prot-note placeholder="Kommentar til beskyttelse">${esc(b.protection.note)}</textarea>
+      </div>
+    </details>
+  `;
+
+  container.querySelectorAll("[data-prot-code]").forEach(btn => {
     btn.addEventListener("click", () => {
-      const code = btn.getAttribute("data-select-prot");
-      const exists = b.protectionMeasures.includes(code);
-      if(!exists) b.protectionMeasures.push(code);
-      modal.remove();
+      const code = btn.getAttribute("data-prot-code");
+      if(isSelected(code)){
+        b.protection.selected = b.protection.selected.filter(x => x !== code);
+      } else {
+        b.protection.selected.push(code);
+      }
       renderProtectionMeasures();
       saveBuild();
     });
   });
+
+  const noteArea = container.querySelector("[data-prot-note]");
+  if(noteArea){
+    noteArea.addEventListener("input", () => {
+      b.protection.note = noteArea.value;
+      saveBuild();
+    });
+  }
 }
 
 function renderChipGroup(containerId, options, selectedArr, onToggle){
@@ -2686,7 +2692,7 @@ function renderConstructionMaterialsReport(bld) {
   const parts = config.buildingParts || [];
   const materialsMap = (bld.materials && !Array.isArray(bld.materials)) ? bld.materials : null;
   const hasMaterials = materialsMap && parts.some(p => (materialsMap[p.key]?.selected || []).length > 0);
-  const hasNewProtection = bld.protectionMeasures && bld.protectionMeasures.length > 0;
+  const hasNewProtection = bld.protection && Array.isArray(bld.protection.selected) && bld.protection.selected.length > 0;
 
   if (hasMaterials || hasNewProtection) {
     if (hasMaterials) {
@@ -2709,30 +2715,15 @@ function renderConstructionMaterialsReport(bld) {
     }
 
     if (hasNewProtection) {
-      const labels = bld.protectionMeasures.map(entry => {
-        const code = typeof entry === 'string' ? entry : (entry?.code || entry?.label);
-        if(!code) return null;
-        const p = PROTECTION.find(x => x.code === code);
-        return p ? p.label : code;
-      }).filter(Boolean).sort();
-      html += `<p><strong>Beskyttelse:</strong> ${esc(labels.join(", "))}</p>\n`;
+      const protectionConfig = getProtectionConfig();
+      const selected = (bld.protection && Array.isArray(bld.protection.selected)) ? bld.protection.selected : [];
+      const labels = selected.map(code => protectionConfig.protectionLabels[code] || code).filter(Boolean).sort();
 
-      // Add details for specific protection measures
-      if(bld.protectionDetails){
-        if(bld.protectionMeasures.includes("S") && bld.protectionDetails.sprinkler){
-          const s = bld.protectionDetails.sprinkler;
-          if(s.hasReport){
-            html += `<p style="margin-left:20px;"><em>Sprinklerrapport:</em> `;
-            if(s.reportDate) html += `Sist gjennomført ${esc(s.reportDate)}. `;
-            if(s.score) html += `Score: ${esc(s.score)}/10`;
-            html += `</p>\n`;
-          }
-        }
-        if(bld.protectionMeasures.includes("A") && bld.protectionDetails.alarm){
-          if(bld.protectionDetails.alarm.connectedToCentral){
-            html += `<p style="margin-left:20px;"><em>Brannalarmanlegg:</em> Tilknyttet alarmsentral</p>\n`;
-          }
-        }
+      if(labels.length > 0){
+        html += `<p><strong>Beskyttelse:</strong> ${esc(labels.join(", "))}</p>\n`;
+      }
+      if(bld.protection && bld.protection.note){
+        html += `<p><strong>Beskyttelse – Notat:</strong> ${esc(bld.protection.note)}</p>\n`;
       }
     }
   } else {
@@ -2746,9 +2737,18 @@ function renderConstructionMaterialsReport(bld) {
     }
 
     if (bld.protection && bld.protection.length > 0) {
+      const protectionConfig = getProtectionConfig();
+      const codeMap = {
+        S: "sprinkleranlegg",
+        A: "brannalarmanlegg",
+        I: "innbruddsalarmanlegg",
+        G: "gasslokkeanlegg",
+        R: "roeykventilasjon",
+        D: "delvis-beskyttelse"
+      };
       const protectionLabels = bld.protection.map(code => {
-        const p = PROTECTION.find(x => x.code === code);
-        return p ? p.label : code;
+        const mapped = protectionConfig.protectionLabels[code] ? code : (codeMap[code] || code);
+        return protectionConfig.protectionLabels[mapped] || code;
       }).sort();
       html += `<p><strong>Beskyttelse:</strong> ${esc(protectionLabels.join(", "))}</p>\n`;
     }
