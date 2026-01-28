@@ -3,41 +3,69 @@
 <head>
   <meta charset="utf-8" />
   <meta name="viewport" content="width=device-width, initial-scale=1" />
-  <title>Befaring</title>
+  <title>Befaringsapp</title>
 
   <link rel="manifest" href="./manifest.webmanifest">
   <meta name="theme-color" content="#3D3D3D">
-  <link rel="apple-touch-icon" href="./icons/icon-192.png">
+  
+  <link rel="icon" type="image/png" sizes="192x192" href="./icons/icon-192.png">
+  <link rel="icon" type="image/png" sizes="512x512" href="./icons/icon-512.png">
+  <link rel="apple-touch-icon" href="./icons/apple-touch-icon.png">
 
   <link rel="stylesheet" href="./styles.css">
-  <link rel="stylesheet" href="./print.css">
+  <link rel="stylesheet" href="./buttons.css">
+  <link rel="stylesheet" href="./report.css">
+  
+  <!-- Fabric.js for canvas annotations -->
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/fabric.js/5.3.0/fabric.min.js"></script>
 </head>
-<body>
+<body id="top">
 <header class="header">
   <div class="wrap header__bar">
     <div class="brand">
+      <div class="logo">B</div>
       <div>
-        <div class="t1">Befaring</div>
-        <div class="t2">Risikogjennomgang og dato</div>
+        <div class="t1">Befaringsrapport</div>
+        <div class="t2" id="todayLabel">Risikogjennomgang</div>
       </div>
     </div>
     <div class="actions">
-      <button class="btn" id="btnViewSaved" onclick="window.location.href='saved-inspections.html'">📋 Lagrede</button>
-      <button class="btn" id="btnSave">Lagre</button>
-      <button class="btn" id="btnLoad">Last</button>
-      <button class="btn danger" id="btnReset">Nullstill</button>
-      <button class="btn" id="btnExportPdf">Eksporter PDF</button>
-      <button class="btn" id="btnShare">Send rapport</button>
-      <button class="btn primary" id="btnExport">Eksporter Word</button>
-      <button class="btn" id="btnArchive">Arkiver befaring</button>
+      <button class="btn btn--tertiary" id="btnUpdateApp" style="display:none;">Oppdater app</button>
+      <button class="btn btn--tertiary" id="btnBackToLanding" style="display:none;">Til start</button>
+      <button class="btn btn--tertiary" id="btnGoLocations" style="display:none;">Lokasjoner</button>
+      <button class="btn btn--tertiary" id="btnGoFindings" style="display:none;">Avvik/Anbefaling</button>
+      <button class="btn btn--tertiary" id="btnGoReport" style="display:none;">📄 Rapport</button>
     </div>
   </div>
 </header>
 
+<!-- Mobil meny (in-flow, ikke sticky) -->
+<section class="wrap mobile-menu">
+  <details>
+    <summary>☰ Meny</summary>
+    <div class="mobile-menu__panel">
+      <div class="btn-row">
+        <button class="btn btn--tertiary" id="mBtnUpdateApp" style="display:none;">Oppdater app</button>
+        <button class="btn btn--tertiary" id="mBtnBackToLanding" style="display:none;">Til start</button>
+        <button class="btn btn--tertiary" id="mBtnGoLocations" style="display:none;">Lokasjoner</button>
+        <button class="btn btn--tertiary" id="mBtnGoFindings" style="display:none;">Avvik/Anbefaling</button>
+        <button class="btn btn--tertiary" id="mBtnGoReport" style="display:none;">📄 Rapport</button>
+      </div>
+    </div>
+  </details>
+</section>
+
 <main class="wrap">
-  <section class="card">
-    <h2>Kunde (BRREG)</h2>
-    <p class="muted">Skriv org.nr (9 siffer) for oppslag.</p>
+
+  <!-- TRINN 0: LANDING -->
+  <section class="card" id="stepLanding">
+    <h1 style="margin:0 0 6px;">Befaringsrapport – Risikogjennomgang</h1>
+    <div class="muted" id="landingDate"></div>
+
+    <hr style="margin:14px 0; border:none; border-top:1px solid #eee;">
+
+    <h2>Kunde / eier av bygg (BRREG)</h2>
+    <p class="muted">Søk med org.nr (9 siffer) eller navn. Velg riktig treff.</p>
 
     <div class="row">
       <div>
@@ -45,60 +73,91 @@
         <input id="orgnr" inputmode="numeric" placeholder="9 siffer" />
       </div>
       <div>
-        <label>Kundenavn</label>
-        <input id="customerName" placeholder="Fylles fra BRREG" />
+        <label>Søk på navn</label>
+        <input id="companySearch" placeholder="F.eks. 'Oslo kommune' / 'ABC AS'" />
       </div>
     </div>
 
-    <div class="row">
+    <div class="btn-row">
+      <button class="btn btn--secondary" id="btnSearchBrreg">Søk</button>
+      <span class="status" id="brregStatus">BRREG: klar</span>
+    </div>
+
+    <div id="brregResults" class="addrBox" style="display:none;">
+      <div class="addrBox__title">Treff fra BRREG (velg)</div>
+      <div id="brregList" class="addrBox__list"></div>
+    </div>
+
+    <div class="row" style="margin-top:12px;">
+      <div>
+        <label>Kundenavn</label>
+        <input id="customerName" placeholder="Fylles fra BRREG" />
+      </div>
       <div>
         <label>Organisasjonsform</label>
         <input id="orgForm" placeholder="Fylles fra BRREG" />
       </div>
+    </div>
+
+    <div class="row">
       <div>
         <label>Næringskode</label>
         <input id="industry" placeholder="Fylles hvis tilgjengelig" />
       </div>
+      <div></div>
     </div>
 
-    <div class="status" id="brregStatus">BRREG: klar</div>
-  </section>
+    <hr style="margin:14px 0; border:none; border-top:1px solid #eee;">
 
-  <section class="card">
-    <h2>Rapportinfo</h2>
-    <div class="row">
-      <div>
-        <label>Befaringsdato</label>
-        <input id="inspectionDate" type="date" />
+    <h2>Deltakere</h2>
+
+    <div class="split">
+      <div class="subcard">
+        <div class="subhead">
+          <h3 style="margin:0;">KLP</h3>
+          <button class="btn btn--chip" id="btnAddKlp">+ Legg til flere</button>
+        </div>
+        <div id="klpAttendees"></div>
       </div>
-      <div>
-        <label>Rapport utarbeidet av</label>
-        <input id="reportAuthor" placeholder="Navn" />
+
+      <div class="subcard">
+        <div class="subhead">
+          <h3 style="margin:0;" id="customerHeading">Kunde</h3>
+          <button class="btn btn--chip" id="btnAddCustomerAtt">+ Legg til flere</button>
+        </div>
+        <div id="customerAttendees"></div>
       </div>
     </div>
 
-    <h3 style="margin-top:14px;">Tilstede ved gjennomgang</h3>
-    <div id="attendees"></div>
-    <button class="btn" id="btnAddAttendee">+ Legg til person</button>
+    <div class="mobile-actionbar">
+      <div class="btn-row">
+        <button class="btn btn--primary" id="btnStartInspection">Start befaring</button>
+      </div>
+    </div>
   </section>
 
-  <section class="card">
+  <!-- TRINN 1: LOKASJONER + GPS + BYGGINFO -->
+  <section class="card" id="stepLocations" style="display:none;">
     <div class="locHeader">
-      <h2 style="margin:0;">Lokasjoner</h2>
-      <button class="btn primary" id="btnAddLocation">+ Ny lokasjon</button>
+      <h2 style="margin:0;">Lokasjoner (flere objekter)</h2>
+      <button class="btn btn--chip" id="btnAddLocation">+ Legg til flere lokasjoner</button>
     </div>
 
     <div id="locTabs" class="locTabs"></div>
 
     <div class="row">
       <div>
-        <label>Adresse</label>
-        <input id="address" placeholder="Velg fra forslag eller skriv manuelt" />
+        <label>Adresse (velg fra forslag)</label>
+        <input id="address" placeholder="Adresse" />
+      </div>
+      <div>
+        <label>Objektnavn (valgfritt)</label>
+        <input id="objectName" placeholder="F.eks. Bygg A / Lager / Skolebygg" />
       </div>
     </div>
 
-    <div class="inline">
-      <button class="btn" id="btnGPS">Hent GPS</button>
+    <div class="btn-row">
+      <button class="btn btn--secondary" id="btnGPS">Hent GPS + foreslå adresser</button>
       <span class="pill"><span class="dot green"></span><span id="gpsStatus">GPS: ikke hentet</span></span>
     </div>
 
@@ -107,66 +166,250 @@
       <div id="addrSuggestions" class="addrBox__list"></div>
       <div class="muted">Velg riktig adresse. Du kan fortsatt redigere manuelt.</div>
     </div>
-  </section>
 
-  <section class="card">
-    <div class="devHeader">
-      <h2 id="devHeaderTitle" style="margin:0;">Punkt</h2>
-      <div class="muted" id="devHeaderSub"></div>
+    <hr style="margin:16px 0; border:none; border-top:1px solid #eee;">
+
+    <div class="locHeader">
+      <h3 style="margin:0;">Bygg på denne lokasjonen</h3>
+      <button class="btn btn--chip" id="btnAddBuilding">+ Legg til flere bygg</button>
+    </div>
+
+    <div id="buildingTabs" class="locTabs"></div>
+
+    <div class="row">
+      <div>
+        <label>Byggbeskrivelse (heading)</label>
+        <input id="buildingLabel" placeholder="F.eks. Hovedbygg / Lagerbygg / Verksted" />
+      </div>
+      <div>
+        <label>Bygningsnummer
+          <a href="https://eiendomsinnsyn.no/" target="_blank" style="margin-left: 8px; font-size: 11px; color: var(--p); text-decoration: none; font-weight: 900;">Hent fra eiendomsinnsyn.no ↗</a>
+        </label>
+        <input id="buildingNo" placeholder="Bygningsnummer" />
+      </div>
+    </div>
+
+    <hr style="margin:16px 0; border:none; border-top:1px solid #eee;">
+
+    <h3>1. Beskrivelse av bygg (for valgt lokasjon)</h3>
+
+    <div>
+      <label>Virksomhet i bygg (flere mulig)</label>
+      <input id="businessManual" placeholder="Legg til manuelt og trykk Enter…" />
+      <div class="chips" id="businessSelected"></div>
+      <div class="muted" id="businessStatus" style="margin-top:6px;"></div>
+    </div>
+
+    <div class="btn-row">
+      <button class="btn btn--secondary" id="btnSuggestBusiness">Foreslå virksomhet (offentlige kilder)</button>
+      <span class="muted" id="businessStatus"></span>
+    </div>
+
+    <div id="businessSuggestions" class="addrBox" style="display:none;">
+      <div class="addrBox__title">Forslag (velg ett)</div>
+      <div id="businessList" class="addrBox__list"></div>
     </div>
 
     <div class="row">
       <div>
+        <label>Byggeår</label>
+        <input id="buildYear" inputmode="numeric" placeholder="År" />
+      </div>
+      <div>
+        <label>Totalareal (m²)</label>
+        <input id="areaM2" inputmode="numeric" placeholder="m²" />
+      </div>
+    </div>
+
+    <div class="muted" style="margin-top:8px;">
+      Fordel totalarealet per bruksområde (basert på valgte virksomheter).
+    </div>
+    <div id="areaBreakdown"></div>
+    <div class="muted" id="areaSumStatus"></div>
+
+    <div class="row">
+      <div>
+        <label>Antall etg.</label>
+        <input id="floors" inputmode="numeric" placeholder="Antall" />
+      </div>
+      <div></div>
+    </div>
+
+    <hr style="margin:16px 0; border:none; border-top:1px solid #eee;">
+
+    <h4>Konstruksjon – Materialer</h4>
+    
+    <div class="report__infobox" style="margin-bottom:16px;">
+      <p>
+        Velg materialer per konstruksjonsdel.
+      </p>
+    </div>
+
+    <!-- Konstruksjonsdeler med Material-valg -->
+    <div id="constructionPartsContainer">
+      <!-- Rendres dynamisk fra app.js -->
+    </div>
+
+    <hr style="margin:16px 0; border:none; border-top:1px solid #eee;">
+
+    <h4>Beskyttelse</h4>
+    <div class="report__infobox" style="margin-bottom:16px;">
+      <p>
+        Registrer beskyttende tiltak (sprinkler, alarmer, barrierer m.m.).
+      </p>
+    </div>
+    <div id="protectionChips" class="chips"></div>
+
+    <hr style="margin:16px 0; border:none; border-top:1px solid #eee;">
+
+    <div style="display:flex; align-items:center; justify-content:space-between; position:relative;">
+      <label style="margin:0;">Bygningsbeskrivelse</label>
+      <button class="btn-icon" id="btnHelpDesc" title="Hjelpetekst">?</button>
+      <div popover="auto" id="popDesc" class="help-popover">
+        <button class="help-popover__close" aria-label="Lukk">×</button>
+        <div class="help-popover__content">
+          Her føres korte kommentarer til den skjematiske fremstilling av bygget i tabellen. For eksempel kan det beskrives litt nærmere om; isolasjons materialer, innvendige brannvegger, avstand til nabobygg, eller andre forhold som kan betydning for risikovurderingen av anlegget.
+        </div>
+      </div>
+    </div>
+    <textarea id="bDesc"></textarea>
+
+    <div style="display:flex; align-items:center; justify-content:space-between; position:relative;">
+      <label style="margin:0;">Sikkerhetsforhold</label>
+      <button class="btn-icon" id="btnHelpSafety" title="Hjelpetekst">?</button>
+      <div popover="auto" id="popSafety" class="help-popover">
+        <button class="help-popover__close" aria-label="Lukk">×</button>
+        <div class="help-popover__content">
+          Her beskrives kort branntekniske eller andre risikoforhold som for eks.: Utplassering og merking av slukkeutstyr, avfallshåndtering, orden i rømningsveier, tilstanden til branndører, innbruddsikring osv. Er det lite å bemerke og man ikke finner det formålstjenlig å utstede liste med anbefalinger eller fotorapport kan befaringsrapporten avsluttes her og øvrige sider slettes.
+        </div>
+      </div>
+    </div>
+    <textarea id="bSafety"></textarea>
+
+    <div style="display:flex; align-items:center; justify-content:space-between; position:relative;">
+      <label style="margin:0;">Generell vurdering av risiko</label>
+      <button class="btn-icon" id="btnHelpRisk" title="Hjelpetekst">?</button>
+      <div popover="auto" id="popRisk" class="help-popover">
+        <button class="help-popover__close" aria-label="Lukk">×</button>
+        <div class="help-popover__content">
+          Her beskrives den generelle vurderingen av risikoen, som ikke omfatter bygningsbeskrivelse eller sikkerhetsforhold. Forvaltning, drift og vedlikehold skal kommenteres spesifikt her.
+        </div>
+      </div>
+    </div>
+    <textarea id="bRisk"></textarea>
+
+    <div class="mobile-actionbar">
+      <div class="btn-row">
+        <button class="btn btn--secondary" id="btnToFindings">Registrer avvik/anbefaling</button>
+      </div>
+    </div>
+  </section>
+
+  <!-- TRINN 2: AVVIK / ANBEFALING (knyttes til objekt) -->
+  <section class="card" id="stepFindings" style="display:none;">
+    <h2>Avvik / anbefaling</h2>
+    <p class="muted">Legg inn avvik/anbefaling og koble til riktig objekt dersom det finnes flere lokasjoner.</p>
+
+    <div class="row">
+      <div>
+        <label>Gjelder objekt</label>
+        <select id="findingLocation"></select>
+      </div>
+      <div>
         <label>Type</label>
-        <select id="itemType">
+        <select id="findingType">
           <option value="AVVIK" selected>Avvik</option>
           <option value="ANBEFALING">Anbefaling</option>
         </select>
-      </div>
-      <div>
-        <label>Ref.nr (auto)</label>
-        <input id="itemRef" disabled />
       </div>
     </div>
 
     <div class="row">
       <div>
         <label>Alvorlighet (kun avvik)</label>
-        <select id="itemSeverity">
+        <select id="findingSeverity">
           <option value="Høy">Høy</option>
           <option value="Middels" selected>Middels</option>
           <option value="Lav">Lav</option>
         </select>
       </div>
       <div>
-        <label>Frist for tilbakemelding (kun avvik)</label>
-        <input id="itemDue" type="date" />
+        <label>Frist (kun avvik)</label>
+        <input id="findingDue" type="date" />
       </div>
     </div>
 
     <label>Tittel</label>
-    <input id="itemTitle" placeholder="Kort beskrivelse" />
+    <input id="findingTitle" placeholder="Kort beskrivelse" />
 
     <label>Beskrivelse</label>
-    <textarea id="itemDesc" placeholder="Hva er observert? Hva anbefales?"></textarea>
+    <textarea id="findingDesc" placeholder="Hva er observert? Hva anbefales?"></textarea>
 
-    <label>Bilder (flere)</label>
-    <input id="itemPhotos" type="file" accept="image/*" capture="environment" multiple>
-
-    <div class="inline">
-      <button class="btn primary" id="btnAddItem">Legg til</button>
-      <span class="muted">Du kan legge til flere bilder og kommentere per bilde etterpå.</span>
+    <div class="btn-row" style="margin-top: 12px;">
+      <button class="btn btn--primary" id="btnAddImageAnnotations">📷 Legg til bilder</button>
     </div>
 
-    <div id="itemList"></div>
+    <div id="imageThumbnails"></div>
+
+    <div class="btn-row">
+      <button class="btn btn--secondary" id="btnAiSuggest" style="display:none;">🤖 Foreslå tekst fra bilde (AI)</button>
+    </div>
+
+    <div id="aiSuggestStatus" style="display:none; margin-top:8px; padding:8px; background:#f0f0f0; border-radius:4px;">
+      <div class="muted" id="aiSuggestMessage"></div>
+    </div>
+
+    <div class="mobile-actionbar">
+      <div class="btn-row">
+        <button class="btn btn--primary" id="btnAddFinding">Lagre avvik anbefaling</button>
+      </div>
+    </div>
+
+    <div id="findingList"></div>
+
+    <hr style="margin:24px 0; border:none; border-top:1px solid #eee;">
+
+    <div class="mobile-actionbar">
+      <div class="btn-row">
+        <button class="btn btn--tertiary" id="btnBackToLocations">Tilbake: Lokasjoner</button>
+      </div>
+    </div>
   </section>
+
+  <!-- TRINN 3: RAPPORT -->
+  <section class="card" id="stepReport" style="display:none;">
+    <div class="report-header">
+      <h1>Rapport</h1>
+      <div class="report-actions">
+        <button class="btn btn--secondary" id="btnExportPDF">📄 Åpne som PDF</button>
+        <button class="btn btn--primary" id="btnExportEmail">📧 Send på e-post</button>
+        <button class="btn btn--secondary" id="btnExportWord">📝 Last ned Word</button>
+      </div>
+    </div>
+
+    <hr style="margin:20px 0; border:none; border-top:1px solid #ddd;">
+
+    <div style="background:#f0f8ff; border-left:4px solid #0DB28A; padding:12px 16px; margin:16px 0; border-radius:4px; font-size:13px; color:#333;">
+      <strong>💡 Tips for farge i utskrift:</strong><br>
+      Når du trykker «Åpne som PDF» og deretter «Skriv ut», husk å:<br>
+      ✓ Slå på <strong>Bakgrunnsgrafikk</strong><br>
+      ✓ Velg <strong>Farge</strong> (ikke Svart/hvitt) under «Flere innstillinger»
+    </div>
+
+    <div id="reportPreview" class="report-preview">
+      <!-- Rapporten rendres her av JavaScript -->
+    </div>
+      <div class="btn-row" style="margin-top:16px;">
+        <a class="btn btn--tertiary" href="#top">Til toppen</a>
+      </div>
+  </section>
+
 </main>
 
-<script>
-  if ("serviceWorker" in navigator) {
-    navigator.serviceWorker.register("./sw.js").catch(()=>{});
-  }
-</script>
+<script src="./imageStore.js"></script>
+<script src="./imageAnnotator.js"></script>
+<script src="./imageCaptureFlow.js"></script>
+<script src="./thumbnailGrid.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>
