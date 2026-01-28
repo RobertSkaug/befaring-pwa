@@ -1,10 +1,11 @@
-const CACHE = "befaring-pwa-v29";
+const CACHE = "befaring-pwa-v30";
 const ASSETS = [
   "./",
   "./index.html",
   "./styles.css",
   "./buttons.css",
   "./app.js",
+  "./src/config/materials.js",
   "./report.css",
   "./report-print.css",
   "./imageStore.js",

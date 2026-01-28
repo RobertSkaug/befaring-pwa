@@ -110,7 +110,7 @@ const $ = (id) => document.getElementById(id);
 const digits = (s) => (s||"").replace(/\D+/g,"");
 const esc = (s) => String(s??"").replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
-const MATERIALS = [
+const LEGACY_MATERIALS = [
   { code:"B", label:"Betong" },
   { code:"S", label:"Stål" },
   { code:"T", label:"Tre" },
@@ -118,6 +118,9 @@ const MATERIALS = [
   { code:"U", label:"Ubrennbar isolasjon" },
   { code:"C", label:"Brennbar isolasjon" }
 ];
+function getMaterialConfig(){
+  return window.MaterialConfig || { buildingParts: [], materialLabels: {} };
+}
 const PROTECTION = [
   { code:"S", label:"Sprinkleranlegg" },
   { code:"A", label:"Brannalarmanlegg" },
@@ -221,8 +224,11 @@ function newBuilding(id){
     areaBreakdown:{},
     floors:"",
     
-    // Konstruksjonsmaterialer per del (kun materialer)
-    // Format: { partName: [{type:'material', label:'...'}] }
+    // Bygningsmaterialer per del (ny modell)
+    // materials[partKey] = { selected: string[], otherText?: string, note?: string, photos?: string[] }
+    materials: {},
+
+    // Konstruksjonsmaterialer per del (legacy – migreres ved load)
     constructionMaterials: {
       soyler: [],      // Søyler
       bjelker: [],     // Bjelker
@@ -240,7 +246,7 @@ function newBuilding(id){
     deck:[],
     roof:[],
     outerWall:[],
-    materials:[],
+    legacyMaterials:[],
     protection:[],
     
     description:"",
@@ -475,11 +481,55 @@ function openHelpModal(title, text){
 function migrateConstructionData(){
   state.locations.forEach(loc => {
     loc.buildings.forEach(b => {
+      const config = getMaterialConfig();
+      const parts = config.buildingParts || [];
+
+      const ensurePart = (partKey) => {
+        if(!b.materials || Array.isArray(b.materials)) b.materials = {};
+        if(!b.materials[partKey]){
+          b.materials[partKey] = { selected: [], otherText: "", note: "", photos: [] };
+        } else {
+          b.materials[partKey].selected = Array.isArray(b.materials[partKey].selected) ? b.materials[partKey].selected : [];
+          b.materials[partKey].otherText = b.materials[partKey].otherText || "";
+          b.materials[partKey].note = b.materials[partKey].note || "";
+          b.materials[partKey].photos = Array.isArray(b.materials[partKey].photos) ? b.materials[partKey].photos : [];
+        }
+      };
+
+      const mapLegacyPart = (legacyKey) => {
+        const map = {
+          soyler: "soeyler",
+          bjelker: "bjelker",
+          dekk: "dekke",
+          tak: "tak",
+          yttervegg: "yttervegg"
+        };
+        return map[legacyKey] || null;
+      };
+
+      const labelToCode = (label, allowedCodes) => {
+        if(!label) return null;
+        const normalized = String(label).toLowerCase().trim();
+        return allowedCodes.find(code => (config.materialLabels[code] || "").toLowerCase() === normalized) || null;
+      };
+
+      const appendNote = (partKey, text) => {
+        if(!text) return;
+        ensurePart(partKey);
+        const current = b.materials[partKey].note || "";
+        b.materials[partKey].note = current ? `${current}\n${text}` : text;
+      };
+
       // init nye strukturer
       if(!b.constructionMaterials){
         b.constructionMaterials = { soyler: [], bjelker: [], dekk: [], tak: [], yttervegg: [] };
       }
       if(!b.protectionMeasures) b.protectionMeasures = [];
+
+      if(Array.isArray(b.materials)){
+        b.legacyMaterials = b.materials;
+        b.materials = {};
+      }
 
       // Normaliser protectionMeasures til koder (ikke objekter)
       b.protectionMeasures = (b.protectionMeasures || [])
@@ -489,38 +539,45 @@ function migrateConstructionData(){
       const pushProtUnique = (arr, code) => {
         if(code && !arr.includes(code)) arr.push(code);
       };
-      const pushMatUnique = (arr, item) => {
-        if(!item) return;
-        const exists = arr.find(x => x.code === item.code && x.type === 'material');
-        if(!exists) arr.push(item);
-      };
-
-      // Flytt eventuelle protection items ut av constructionMaterials
+      // Flytt eventuelle materialer fra constructionMaterials til ny modell
       Object.keys(b.constructionMaterials).forEach(partId => {
+        const targetKey = mapLegacyPart(partId);
+        if(!targetKey) return;
+
+        ensurePart(targetKey);
+        const allowed = (parts.find(p => p.key === targetKey)?.materialOptions || []).map(x => x.code);
         const arr = b.constructionMaterials[partId] || [];
-        const keep = [];
+
         arr.forEach(item => {
           if(item.type === 'protection'){
             pushProtUnique(b.protectionMeasures, item.code || item.label);
+            return;
+          }
+          const label = item.label || (LEGACY_MATERIALS.find(x => x.code === item.code)?.label) || "";
+          const mapped = labelToCode(label, allowed);
+          if(mapped){
+            if(!b.materials[targetKey].selected.includes(mapped)) b.materials[targetKey].selected.push(mapped);
           } else {
-            // sørg for at type er 'material'
-            if(item.code || item.label){
-              const mat = MATERIALS.find(x => x.code === item.code);
-              const cleanLabel = mat ? mat.label : (item.label || "");
-              keep.push({ type: 'material', code: item.code, label: cleanLabel });
-            }
+            b.materials[targetKey].selected = ["ukjent"];
+            appendNote(targetKey, `Legacy materiale: ${label || item.code || "Ukjent"}`);
           }
         });
-        b.constructionMaterials[partId] = keep;
       });
 
-      // Migrer legacy materials -> constructionMaterials (yttervegg som default)
-      const needsMat = Object.values(b.constructionMaterials).every(a => (a||[]).length === 0);
-      if(needsMat && b.materials && b.materials.length > 0){
-        const target = b.constructionMaterials.yttervegg;
-        b.materials.forEach(code => {
-          const mat = MATERIALS.find(x => x.code === code);
-          if(mat) pushMatUnique(target, { type:'material', code, label: mat.label });
+      // Migrer legacy materials array -> ny modell (yttervegg default)
+      if(Array.isArray(b.legacyMaterials) && b.legacyMaterials.length > 0){
+        const targetKey = "yttervegg";
+        ensurePart(targetKey);
+        const allowed = (parts.find(p => p.key === targetKey)?.materialOptions || []).map(x => x.code);
+        b.legacyMaterials.forEach(code => {
+          const label = LEGACY_MATERIALS.find(x => x.code === code)?.label || code;
+          const mapped = labelToCode(label, allowed);
+          if(mapped){
+            if(!b.materials[targetKey].selected.includes(mapped)) b.materials[targetKey].selected.push(mapped);
+          } else {
+            b.materials[targetKey].selected = ["ukjent"];
+            appendNote(targetKey, `Legacy materiale: ${label}`);
+          }
         });
       }
 
@@ -531,6 +588,9 @@ function migrateConstructionData(){
           if(prot) pushProtUnique(b.protectionMeasures, code);
         });
       }
+
+      // Sørg for at alle bygningsdeler finnes
+      parts.forEach(p => ensurePart(p.key));
     });
   });
 }
@@ -1022,130 +1082,124 @@ function updateAreaSumStatus(){
 }
 
 /**
- * Render konstruksjonsdeler med materialvalg (kompakt grid)
+ * Render konstruksjonsdeler med kontekststyrte materialvalg
  */
 function renderConstructionMaterials(){
   const b = getActiveBuilding();
   const container = $("constructionPartsContainer");
   if(!container) return;
 
-  const parts = [
-    { id: "soyler", label: "Søyler" },
-    { id: "bjelker", label: "Bjelker" },
-    { id: "dekk", label: "Dekke" },
-    { id: "tak", label: "Tak" },
-    { id: "yttervegg", label: "Yttervegg" }
-  ];
+  const config = getMaterialConfig();
+  const parts = config.buildingParts || [];
 
-  let html = `<div style="display:grid; grid-template-columns:repeat(auto-fit,minmax(240px,1fr)); gap:12px;">`;
-  
-  parts.forEach(part => {
-    const items = b.constructionMaterials[part.id] || [];
-    
-    const chipsHtml = items.map((item, idx) => {
-      return `<span class="construction-chip construction-chip--material" data-part="${part.id}" data-idx="${idx}">
-        ${esc(item.label)}
-        <button class="remove-btn" type="button">×</button>
-      </span>`;
-    }).join(" ");
+  if(!b.materials || Array.isArray(b.materials)) b.materials = {};
 
-    html += `
-<div class="card" style="padding:12px;">
-  <div style="display:flex; justify-content:space-between; align-items:center; gap:8px;">
-    <label style="margin:0; font-weight:600;">${esc(part.label)}</label>
-    <button class="btn btn--sm" type="button" data-add-to-part="${part.id}">+ Legg til</button>
-  </div>
-  <div style="display:flex; flex-wrap:wrap; gap:8px; margin-top:10px;">
-    ${chipsHtml || '<span class="muted" style="font-size:13px;">Ingen materialer valgt</span>'}
-  </div>
-</div>`;
-  });
+  const getPartState = (key) => {
+    if(!b.materials[key]) b.materials[key] = { selected: [], otherText: "", note: "", photos: [] };
+    b.materials[key].selected = Array.isArray(b.materials[key].selected) ? b.materials[key].selected : [];
+    b.materials[key].otherText = b.materials[key].otherText || "";
+    b.materials[key].note = b.materials[key].note || "";
+    b.materials[key].photos = Array.isArray(b.materials[key].photos) ? b.materials[key].photos : [];
+    return b.materials[key];
+  };
 
-  html += `</div>`;
-  container.innerHTML = html;
+  const labelFor = (code) => config.materialLabels[code] || code;
 
-  // Event listeners for add-knapper
-  container.querySelectorAll("[data-add-to-part]").forEach(btn => {
-    btn.addEventListener("click", (e) => {
-      e.preventDefault();
-      const partId = btn.getAttribute("data-add-to-part");
-      openConstructionPicker(partId);
+  const chipsFor = (partKey, options, selected) => {
+    return options.map(opt => {
+      const code = opt.code;
+      const isActive = selected.includes(code);
+      return `
+        <button type="button" class="construction-chip ${isActive ? "construction-chip--material" : ""}" data-mat-part="${partKey}" data-mat-code="${code}">
+          ${esc(opt.label)}
+        </button>
+      `;
+    }).join("");
+  };
+
+  container.innerHTML = parts.map(part => {
+    const state = getPartState(part.key);
+    const selectedLabels = state.selected.map(labelFor).join(", ") || "Ingen valgt";
+    const showOther = state.selected.includes("annet");
+
+    return `
+      <details class="card" style="padding:12px;">
+        <summary style="display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer;">
+          <span style="font-weight:600;">${esc(part.label)}</span>
+          <span class="muted" style="font-size:12px;">${esc(selectedLabels)}</span>
+        </summary>
+
+        <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;">
+          ${chipsFor(part.key, part.materialOptions, state.selected)}
+        </div>
+
+        <div style="margin-top:10px;">
+          <button type="button" class="btn btn--sm" data-mark-unknown="${part.key}">Marker som ukjent</button>
+        </div>
+
+        <div style="margin-top:10px; ${showOther ? "" : "display:none;"}" data-other-wrap="${part.key}">
+          <label>Spesifiser annet</label>
+          <input type="text" data-other-input="${part.key}" placeholder="Beskriv annet materiale" value="${esc(state.otherText)}" />
+        </div>
+
+        <div style="margin-top:10px;">
+          <label>Notat</label>
+          <textarea data-note-input="${part.key}" placeholder="Notater for denne bygningsdelen">${esc(state.note)}</textarea>
+        </div>
+      </details>
+    `;
+  }).join("");
+
+  container.querySelectorAll("[data-mat-code]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const partKey = btn.getAttribute("data-mat-part");
+      const code = btn.getAttribute("data-mat-code");
+      const state = getPartState(partKey);
+
+      if(code === "ukjent"){
+        state.selected = ["ukjent"];
+      } else {
+        if(state.selected.includes("ukjent")){
+          state.selected = state.selected.filter(x => x !== "ukjent");
+        }
+        if(state.selected.includes(code)){
+          state.selected = state.selected.filter(x => x !== code);
+        } else {
+          state.selected.push(code);
+        }
+      }
+
+      if(!state.selected.includes("annet")) state.otherText = "";
+      renderConstructionMaterials();
+      saveBuild();
     });
   });
 
-  // Event listeners for fjern-knapper
-  container.querySelectorAll("[data-part]").forEach(chip => {
-    const removeBtn = chip.querySelector(".remove-btn");
-    if(removeBtn) {
-      removeBtn.addEventListener("click", (e) => {
-        e.preventDefault();
-        const partId = chip.getAttribute("data-part");
-        const idx = parseInt(chip.getAttribute("data-idx"), 10);
-        b.constructionMaterials[partId].splice(idx, 1);
-        renderConstructionMaterials();
-        saveBuild();
-      });
-    }
-  });
-}
-
-/**
- * Åpne picker modal for å velge material for en konstruksjonsdel
- */
-function openConstructionPicker(partId){
-  const b = getActiveBuilding();
-  b.constructionMaterials[partId] = b.constructionMaterials[partId] || [];
-
-  const partLabels = {
-    soyler: "Søyler",
-    bjelker: "Bjelker",
-    dekk: "Dekke",
-    tak: "Tak",
-    yttervegg: "Yttervegg"
-  };
-  const partLabel = partLabels[partId] || partId;
-  
-  // Lag en modal kun med Material-liste
-  const pickerHtml = `
-<div class="modal-overlay" id="constructionPickerModal">
-  <div class="modal large" style="max-width:600px;">
-    <div class="modal-header">
-      <h2>Legg til materiale</h2>
-      <button class="btn-icon" id="closePicker">✕</button>
-    </div>
-    <div class="modal-body">
-      <h4 style="margin-top:0; color:#0DB28A; font-weight:600;">Materialer</h4>
-      <div style="display:flex; flex-wrap:wrap; gap:10px; margin-bottom:4px;" id="materialPickerList"></div>
-      <p class="muted" style="font-size:13px; margin-top:4px;">Velg materialer for ${esc(partLabel)}.</p>
-    </div>
-  </div>
-</div>`;
-
-  // Inject modal
-  document.body.insertAdjacentHTML("beforeend", pickerHtml);
-  const modal = $("constructionPickerModal");
-  const matList = $("materialPickerList");
-
-  // Render Material-valg
-  matList.innerHTML = MATERIALS.map(m => {
-    return `<button class="btn btn--sm" style="background:var(--klp-lys-fjellgronn); border-color:var(--klp-fjellgronn); color:var(--klp-svart);" data-select-mat="${m.code}">${esc(m.label)}</button>`;
-  }).join("");
-
-  // Close button
-  $("closePicker").addEventListener("click", () => modal.remove());
-  modal.addEventListener("click", (e) => {
-    if(e.target === modal) modal.remove();
-  });
-
-  // Material selection
-  matList.querySelectorAll("[data-select-mat]").forEach(btn => {
+  container.querySelectorAll("[data-mark-unknown]").forEach(btn => {
     btn.addEventListener("click", () => {
-      const code = btn.getAttribute("data-select-mat");
-      const item = MATERIALS.find(x => x.code === code);
-      const exists = (b.constructionMaterials[partId] || []).some(x => x.code === code && x.type === 'material');
-      if(!exists) b.constructionMaterials[partId].push({ type: 'material', label: item.label, code });
-      modal.remove();
+      const partKey = btn.getAttribute("data-mark-unknown");
+      const state = getPartState(partKey);
+      state.selected = ["ukjent"];
+      state.otherText = "";
       renderConstructionMaterials();
+      saveBuild();
+    });
+  });
+
+  container.querySelectorAll("[data-other-input]").forEach(input => {
+    input.addEventListener("input", () => {
+      const partKey = input.getAttribute("data-other-input");
+      const state = getPartState(partKey);
+      state.otherText = input.value;
+      saveBuild();
+    });
+  });
+
+  container.querySelectorAll("[data-note-input]").forEach(area => {
+    area.addEventListener("input", () => {
+      const partKey = area.getAttribute("data-note-input");
+      const state = getPartState(partKey);
+      state.note = area.value;
       saveBuild();
     });
   });
@@ -2478,36 +2532,48 @@ body {
  */
 function renderConstructionMaterialsReport(bld) {
   let html = "";
-  
-  const hasNewMaterials = bld.constructionMaterials && 
-    (bld.constructionMaterials.soyler.length > 0 ||
-     bld.constructionMaterials.bjelker.length > 0 ||
-     bld.constructionMaterials.dekk.length > 0 ||
-     bld.constructionMaterials.tak.length > 0 ||
-     bld.constructionMaterials.yttervegg.length > 0);
+  const config = getMaterialConfig();
+  const parts = config.buildingParts || [];
+
+  const hasNewMaterials = bld.materials && !Array.isArray(bld.materials) && parts.some(p => {
+    const s = bld.materials[p.key] || {};
+    const selected = Array.isArray(s.selected) ? s.selected : [];
+    return selected.length > 0 || s.note || s.otherText;
+  });
+
+  const hasLegacyPerPart = bld.constructionMaterials && (
+    (bld.constructionMaterials.soyler || []).length > 0 ||
+    (bld.constructionMaterials.bjelker || []).length > 0 ||
+    (bld.constructionMaterials.dekk || []).length > 0 ||
+    (bld.constructionMaterials.tak || []).length > 0 ||
+    (bld.constructionMaterials.yttervegg || []).length > 0
+  );
 
   const hasNewProtection = bld.protectionMeasures && bld.protectionMeasures.length > 0;
 
+  const labelFor = (code) => config.materialLabels[code] || code;
+
   if (hasNewMaterials || hasNewProtection) {
-    const partLabels = {
-      soyler: "Søyler",
-      bjelker: "Bjelker",
-      dekk: "Dekke",
-      tak: "Tak",
-      yttervegg: "Yttervegg"
-    };
-
     if (hasNewMaterials) {
-      const parts = Object.keys(bld.constructionMaterials);
-      parts.forEach(partId => {
-        const items = bld.constructionMaterials[partId] || [];
-        if (items.length === 0) return; // Skip tom del
+      parts.forEach(part => {
+        const state = bld.materials[part.key] || {};
+        const selected = Array.isArray(state.selected) ? state.selected : [];
+        if(selected.length === 0 && !state.note && !state.otherText) return;
 
-        const partLabel = partLabels[partId];
-        const materials = items.filter(i => i.type === 'material').map(i => i.label).sort();
+        let labels = selected.map(labelFor).filter(Boolean);
+        if(selected.includes("annet") && state.otherText){
+          labels = labels.filter(l => l !== labelFor("annet"));
+          labels.push(`Annet: ${state.otherText}`);
+        }
 
-        if (materials.length > 0) {
-          html += `<p><strong>${esc(partLabel)} – Materialer:</strong> ${esc(materials.join(", "))}</p>\n`;
+        if(labels.length > 0){
+          html += `<p><strong>${esc(part.label)} – Materialer:</strong> ${esc(labels.join(", "))}</p>\n`;
+        } else {
+          html += `<p><strong>${esc(part.label)} – Materialer:</strong> ${esc(labelFor("ukjent"))}</p>\n`;
+        }
+
+        if(state.note){
+          html += `<p><em>Notat (${esc(part.label)}):</em> ${esc(state.note)}</p>\n`;
         }
       });
     }
@@ -2522,13 +2588,33 @@ function renderConstructionMaterialsReport(bld) {
       html += `<p><strong>Beskyttelse:</strong> ${esc(labels.join(", "))}</p>\n`;
     }
   } else {
-    // FALLBACK: Les fra gamle felter
-    if (bld.materials && bld.materials.length > 0) {
-      const materialLabels = bld.materials.map(code => {
-        const m = MATERIALS.find(x => x.code === code);
-        return m ? m.label : code;
-      }).sort();
-      html += `<p><strong>Bygningsmaterialer:</strong> ${esc(materialLabels.join(", "))}</p>\n`;
+    if (hasLegacyPerPart) {
+      const partLabels = {
+        soyler: "Søyler",
+        bjelker: "Bjelker",
+        dekk: "Dekke",
+        tak: "Tak",
+        yttervegg: "Yttervegg"
+      };
+
+      Object.keys(bld.constructionMaterials || {}).forEach(partId => {
+        const items = bld.constructionMaterials[partId] || [];
+        if (items.length === 0) return;
+        const partLabel = partLabels[partId] || partId;
+        const materials = items.filter(i => i.type === 'material').map(i => i.label).sort();
+        if (materials.length > 0) {
+          html += `<p><strong>${esc(partLabel)} – Materialer:</strong> ${esc(materials.join(", "))}</p>\n`;
+        }
+      });
+    } else {
+      const legacyArray = Array.isArray(bld.materials) ? bld.materials : (Array.isArray(bld.legacyMaterials) ? bld.legacyMaterials : []);
+      if (legacyArray.length > 0) {
+        const materialLabels = legacyArray.map(code => {
+          const m = LEGACY_MATERIALS.find(x => x.code === code);
+          return m ? m.label : code;
+        }).sort();
+        html += `<p><strong>Bygningsmaterialer:</strong> ${esc(materialLabels.join(", "))}</p>\n`;
+      }
     }
 
     if (bld.protection && bld.protection.length > 0) {
