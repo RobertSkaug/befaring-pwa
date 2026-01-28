@@ -109,7 +109,7 @@
   const saveSnapshot = async (id, snap) => {
     try {
       await idbPut(id, snap);
-      safeJson(() => localStorage.setItem(`${SNAPSHOT_FALLBACK_PREFIX}${id}`, JSON.stringify(snap)), null);
+      safeJson(() => localStorage.removeItem(`${SNAPSHOT_FALLBACK_PREFIX}${id}`), null);
       return true;
     } catch {
       safeJson(() => localStorage.setItem(`${SNAPSHOT_FALLBACK_PREFIX}${id}`, JSON.stringify(snap)), null);
@@ -118,17 +118,14 @@
   };
 
   const loadSnapshot = async (id) => {
-    const fromLocal = safeJson(() => {
-      const raw = localStorage.getItem(`${SNAPSHOT_FALLBACK_PREFIX}${id}`);
-      return raw ? JSON.parse(raw) : null;
-    }, null);
-    if(fromLocal) return fromLocal;
-
     try {
       const fromIdb = await idbGet(id);
       if(fromIdb) return fromIdb;
     } catch {}
-    return null;
+    return safeJson(() => {
+      const raw = localStorage.getItem(`${SNAPSHOT_FALLBACK_PREFIX}${id}`);
+      return raw ? JSON.parse(raw) : null;
+    }, null);
   };
 
   const removeSnapshot = async (id) => {

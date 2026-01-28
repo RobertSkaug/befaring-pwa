@@ -47,12 +47,12 @@
       btn.addEventListener("click", async () => {
         const id = btn.getAttribute("data-resume");
         const snap = await store.load(id);
-        if(!snap) return;
-        const item = items.find(x => x.id === id) || {};
-        localStorage.setItem("befaringState", JSON.stringify(snap));
-        sessionStorage.setItem("befaringResumeStep", item.progressHint || "locations");
-        store.setActiveId(id);
-        window.location.href = "./index.html";
+        if(snap){
+          localStorage.setItem("befaringState", JSON.stringify(snap));
+          sessionStorage.setItem("befaringResumeStep", "locations");
+          store.setActiveId(id);
+          window.location.href = "./index.html";
+        }
       });
     });
 
@@ -60,12 +60,12 @@
       btn.addEventListener("click", async () => {
         const id = btn.getAttribute("data-open");
         const snap = await store.load(id);
-        if(!snap) return;
-        const item = items.find(x => x.id === id) || {};
-        localStorage.setItem("befaringState", JSON.stringify(snap));
-        sessionStorage.setItem("befaringResumeStep", item.progressHint || "report");
-        store.setActiveId(id);
-        window.location.href = "./index.html";
+        if(snap){
+          localStorage.setItem("befaringState", JSON.stringify(snap));
+          sessionStorage.setItem("befaringResumeStep", "report");
+          store.setActiveId(id);
+          window.location.href = "./index.html";
+        }
       });
     });
 
