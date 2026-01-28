@@ -74,16 +74,6 @@
     });
   }
 
-  document.querySelectorAll("[data-save-draft]").forEach(btn => {
-    btn.addEventListener("click", () => {
-      try {
-        if(hasCustomer(window.state)){
-          autoSave();
-        }
-      } catch {}
-    });
-  });
-
   const customerName = document.getElementById("customerName");
   if(customerName){
     customerName.addEventListener("input", () => {
