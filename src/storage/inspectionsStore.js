@@ -35,11 +35,13 @@
   const snapshot = (state) => safeJson(() => JSON.parse(JSON.stringify(state || {})), {});
 
   const getTitle = (state) => {
+    const customer = (state?.customer?.name || "").trim();
+    if(customer) return customer;
     const loc = (state?.locations || []).find(l => l.id === state.activeLocationId) || (state?.locations || [])[0] || {};
     const addr = loc.address || "";
     const obj = loc.objectName || "";
     const title = [obj, addr].filter(Boolean).join(" – ");
-    return title || state?.customer?.name || "Befaring";
+    return title || "Befaring";
   };
 
   const detectStep = () => {
