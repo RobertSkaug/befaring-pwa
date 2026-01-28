@@ -1,4 +1,4 @@
-const CACHE = "befaring-pwa-v29";
+const CACHE = "befaring-pwa-v30";
 const ASSETS = [
   "./",
   "./index.html",
@@ -7,11 +7,13 @@ const ASSETS = [
   "./app.js",
   "./report.css",
   "./report-print.css",
+  "./src/config/materials.js",
   "./imageStore.js",
   "./imageAnnotator.js",
   "./imageCaptureFlow.js",
   "./thumbnailGrid.js",
   "./manifest.webmanifest",
+  "./apple-touch-icon.png",
   "./icons/icon-192.png",
   "./icons/icon-512.png",
   "./icons/KLP_logo_koksgraa.png"
