@@ -1271,11 +1271,6 @@ function renderConstructionMaterials(){
   const config = getMaterialConfig();
   const parts = config.buildingParts || [];
 
-  if(!parts.length){
-    container.innerHTML = `<div class="muted">Ingen materialvalg tilgjengelig. Oppdater appen og prøv igjen.</div>`;
-    return;
-  }
-
   if(!b.materials || Array.isArray(b.materials)) b.materials = {};
 
   const getPartState = (key) => {
@@ -1308,7 +1303,7 @@ function renderConstructionMaterials(){
     const showOther = state.selected.includes("annet");
 
     return `
-      <details class="card" style="padding:12px;" data-part-section="${part.key}" open>
+      <details class="card" style="padding:12px;" data-part-section="${part.key}">
         <summary style="display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer;">
           <span style="font-weight:600;">${esc(part.label)}</span>
           <span class="muted" style="font-size:12px;">${esc(selectedLabels)}</span>
@@ -1417,7 +1412,7 @@ function renderProtectionMeasures(){
   }).join("");
 
   container.innerHTML = `
-    <details class="card" style="padding:12px;" open>
+    <details class="card" style="padding:12px;">
       <summary style="display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer;">
         <span style="font-weight:600;">Beskyttelse</span>
         <span class="muted" style="font-size:12px;">${b.protection.selected.length ? `${b.protection.selected.length} valgt` : "Ingen valgt"}</span>
