@@ -84,6 +84,19 @@
     });
   });
 
+  const customerName = document.getElementById("customerName");
+  if(customerName){
+    customerName.addEventListener("input", () => {
+      try { if(hasCustomer(window.state)) autoSave(); } catch {}
+    });
+  }
+  const orgnr = document.getElementById("orgnr");
+  if(orgnr){
+    orgnr.addEventListener("input", () => {
+      try { if(hasCustomer(window.state)) autoSave(); } catch {}
+    });
+  }
+
   document.addEventListener("visibilitychange", () => {
     if(document.visibilityState === "hidden") autoSave();
   });
