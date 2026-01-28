@@ -1,6 +1,7 @@
 (function(){
   const ENABLE_INSPECTION_STORAGE = true;
   const META_KEY = "befaringer_meta";
+  const LEGACY_KEY = "befaringer";
   const ACTIVE_KEY = "befaringActiveId";
   const SNAPSHOT_FALLBACK_PREFIX = "befaringSnapshot:";
   const DB_NAME = "befaring-pwa";
@@ -55,11 +56,49 @@
     });
   };
 
-  const loadMeta = () => safeJson(() => {
-    const raw = localStorage.getItem(META_KEY);
-    const data = raw ? JSON.parse(raw) : [];
-    return Array.isArray(data) ? data : [];
-  }, []);
+  const loadMeta = () => {
+    const existing = safeJson(() => {
+      const raw = localStorage.getItem(META_KEY);
+      const data = raw ? JSON.parse(raw) : [];
+      return Array.isArray(data) ? data : [];
+    }, []);
+
+    if(existing.length > 0) return existing;
+
+    const legacy = safeJson(() => {
+      const raw = localStorage.getItem(LEGACY_KEY);
+      const data = raw ? JSON.parse(raw) : [];
+      return Array.isArray(data) ? data : [];
+    }, []);
+
+    if(legacy.length === 0) return existing;
+
+    const mapped = legacy.map(item => {
+      const id = item.id || genId();
+      const status = item.status === "avsluttet" ? "completed" : "draft";
+      const updatedAt = item.sistOppdatert || new Date().toISOString();
+      const snap = item.data || {};
+
+      safeJson(() => {
+        localStorage.setItem(`${SNAPSHOT_FALLBACK_PREFIX}${id}`, JSON.stringify(snap));
+      }, null);
+
+      return {
+        id,
+        status,
+        title: item.tittel || getTitle(snap),
+        updatedAt,
+        createdAt: updatedAt,
+        progressHint: item.lastStep || "locations",
+        version: META_VERSION,
+        inspectionDate: snap?.inspectionDate || ""
+      };
+    });
+
+    saveMeta(mapped);
+    safeJson(() => localStorage.removeItem(LEGACY_KEY), null);
+    return mapped;
+  };
 
   const saveMeta = (list) => {
     safeJson(() => localStorage.setItem(META_KEY, JSON.stringify(list)), null);
@@ -87,6 +126,8 @@
     const title = [obj, addr].filter(Boolean).join(" – ");
     return title || "Befaring";
   };
+
+  const getInspectionDate = (state) => (state?.inspectionDate || "");
 
   const detectStep = () => {
     const steps = ["landing","locations","findings","report"];
@@ -147,7 +188,8 @@
       updatedAt: now,
       createdAt: now,
       progressHint: detectStep(),
-      version: META_VERSION
+      version: META_VERSION,
+      inspectionDate: getInspectionDate(initialSnapshot)
     };
 
     saveMeta(upsertMeta(loadMeta(), meta));
@@ -175,7 +217,8 @@
       updatedAt: new Date().toISOString(),
       createdAt: existing?.createdAt || new Date().toISOString(),
       progressHint: detectStep(),
-      version: META_VERSION
+      version: META_VERSION,
+      inspectionDate: getInspectionDate(snap)
     };
 
     saveMeta(upsertMeta(list, meta));
@@ -195,7 +238,8 @@
       title: getTitle(snap || existing.title),
       updatedAt: new Date().toISOString(),
       progressHint: existing.progressHint || "report",
-      version: META_VERSION
+      version: META_VERSION,
+      inspectionDate: getInspectionDate(snap) || existing.inspectionDate || ""
     };
 
     saveMeta(upsertMeta(list, meta));
