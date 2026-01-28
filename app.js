@@ -3258,7 +3258,7 @@ async function suggestFromImage(){
     // Bruk annotert eller original versjon
     const base64 = img.hasAnnotations ? img.annotatedDataURL : img.originalDataURL;
     
-    // Kall backend
+    // Kall backend (hvis tilgjengelig)
     const response = await fetch("/api/ai/avvik-forslag", {
       method: "POST",
       headers: { "Content-Type": "application/json" },
@@ -3269,29 +3269,112 @@ async function suggestFromImage(){
 
     if (!response.ok) {
       const error = await response.text();
+      // 405/404 forventes når appen kjører statisk uten backend
+      if (response.status === 405 || response.status === 404) {
+        const fallback = await buildLocalSuggestion(currentFindingImageAssets);
+        applySuggestion(fallback, msgDiv, true);
+        return;
+      }
       throw new Error(`Server error: ${response.status} - ${error}`);
     }
 
     const result = await response.json();
-
-    // Fyll inn forslag
-    if (result.titleSuggestion) {
-      $("findingTitle").value = result.titleSuggestion;
-    }
-    if (result.descriptionSuggestion) {
-      $("findingDesc").value = result.descriptionSuggestion;
-    }
-    if (result.severitySuggestion) {
-      $("findingSeverity").value = result.severitySuggestion;
-    }
-
-    msgDiv.textContent = `✓ AI-forslag fylt inn (Sikkerhet: ${(result.confidence * 100).toFixed(0)}%)`;
+    applySuggestion(result, msgDiv, false);
   } catch (err) {
     console.error("AI suggestion error:", err);
-    msgDiv.textContent = `✗ Feil: ${err.message}`;
+    const fallback = await buildLocalSuggestion(currentFindingImageAssets);
+    applySuggestion(fallback, msgDiv, true, err.message);
   } finally {
     btn.disabled = false;
   }
+}
+
+function applySuggestion(result, msgDiv, isFallback, errMessage){
+  if (result.titleSuggestion) {
+    $("findingTitle").value = result.titleSuggestion;
+  }
+  if (result.descriptionSuggestion) {
+    $("findingDesc").value = result.descriptionSuggestion;
+  }
+  if (result.severitySuggestion) {
+    $("findingSeverity").value = result.severitySuggestion;
+  }
+
+  if (isFallback) {
+    msgDiv.textContent = `✓ Forslag generert lokalt (offline).${errMessage ? " Årsak: " + errMessage : ""}`;
+  } else {
+    msgDiv.textContent = `✓ AI-forslag fylt inn (Sikkerhet: ${(result.confidence * 100).toFixed(0)}%)`;
+  }
+}
+
+async function buildLocalSuggestion(imageIds){
+  const stats = await Promise.all(imageIds.map(async (imageId) => {
+    const img = await window.ImageStore.getImage(imageId);
+    if(!img) return null;
+    const dataUrl = img.hasAnnotations ? img.annotatedDataURL : img.originalDataURL;
+    return getImageStats(dataUrl);
+  }));
+
+  const valid = stats.filter(Boolean);
+  const avg = valid.reduce((acc, s) => {
+    acc.luma += s.avgLuma;
+    acc.var += s.lumaVar;
+    acc.count += 1;
+    return acc;
+  }, { luma:0, var:0, count:0 });
+
+  const avgLuma = avg.count ? avg.luma / avg.count : 128;
+  const lumaVar = avg.count ? avg.var / avg.count : 0;
+
+  let title = "Generell observasjon";
+  let desc = "Bildet viser et område som bør vurderes under befaringen. Kontroller orden, tilgjengelighet og tydelig merking der det er relevant.";
+
+  if (avgLuma < 80) {
+    title = "Mørke områder / belysning";
+    desc = "Bildet fremstår mørkt. Vurder om belysning og sikt er tilstrekkelig, spesielt langs rømningsveier og i tekniske rom.";
+  } else if (lumaVar > 4500) {
+    title = "Ujevnheter / mulig hindringer";
+    desc = "Bildet har stor variasjon i lys/kontrast. Vurder om det finnes hindringer, uoversiktlige forhold eller behov for rydding/merking.";
+  }
+
+  return {
+    titleSuggestion: title,
+    descriptionSuggestion: desc,
+    severitySuggestion: "Middels",
+    confidence: 0.35
+  };
+}
+
+function getImageStats(dataUrl){
+  return new Promise((resolve) => {
+    const image = new Image();
+    image.onload = () => {
+      const size = 32;
+      const canvas = document.createElement("canvas");
+      canvas.width = size;
+      canvas.height = size;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(image, 0, 0, size, size);
+      const data = ctx.getImageData(0, 0, size, size).data;
+
+      let sum = 0;
+      let sumSq = 0;
+      for (let i = 0; i < data.length; i += 4) {
+        const r = data[i];
+        const g = data[i+1];
+        const b = data[i+2];
+        const luma = 0.2126 * r + 0.7152 * g + 0.0722 * b;
+        sum += luma;
+        sumSq += luma * luma;
+      }
+      const n = data.length / 4;
+      const avgLuma = sum / n;
+      const lumaVar = (sumSq / n) - (avgLuma * avgLuma);
+      resolve({ avgLuma, lumaVar });
+    };
+    image.onerror = () => resolve({ avgLuma: 128, lumaVar: 0 });
+    image.src = dataUrl;
+  });
 }
 
 init();
