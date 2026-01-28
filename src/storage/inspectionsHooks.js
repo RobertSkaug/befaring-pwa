@@ -40,6 +40,7 @@
 
   const autoSave = async () => {
     try {
+      if(!hasCustomer(window.state)) return;
       const id = await ensureDraftId();
       if(id) await store.saveDraft(id, window.state);
     } catch {}
@@ -77,15 +78,22 @@
   const customerName = document.getElementById("customerName");
   if(customerName){
     customerName.addEventListener("input", () => {
-      try { if(hasCustomer(window.state)) autoSave(); } catch {}
+      try { autoSave(); } catch {}
     });
   }
   const orgnr = document.getElementById("orgnr");
   if(orgnr){
     orgnr.addEventListener("input", () => {
-      try { if(hasCustomer(window.state)) autoSave(); } catch {}
+      try { autoSave(); } catch {}
     });
   }
+
+  document.addEventListener("input", () => {
+    autoSave();
+  }, true);
+  document.addEventListener("change", () => {
+    autoSave();
+  }, true);
 
   document.addEventListener("visibilitychange", () => {
     if(document.visibilityState === "hidden") autoSave();
