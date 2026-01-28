@@ -239,6 +239,8 @@ function newBuilding(id){
 
     // Ny: Beskyttelse som egen seksjon (ikke knyttet til konstruksjon)
     protectionMeasures: [], // [code]
+    sprinklerLastCheck: "",
+    sprinklerScore: "",
     
     // LEGACY: Behold for bakoverkompatibilitet (migreres ved load)
     columns:[],
@@ -1220,6 +1222,8 @@ function renderProtectionMeasures(){
     return item ? item.label : code;
   }).filter(Boolean);
 
+  const hasSprinkler = b.protectionMeasures.includes("S");
+
   const chips = PROTECTION.map(p => {
     const isActive = b.protectionMeasures.includes(p.code);
     return `
@@ -1239,6 +1243,20 @@ function renderProtectionMeasures(){
       <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;">
         ${chips}
       </div>
+
+      <div style="margin-top:12px; ${hasSprinkler ? "" : "display:none;"}" data-sprinkler-fields>
+        <div class="grid" style="gap:10px;">
+          <div>
+            <label>Siste kontroll (dato)</label>
+            <input type="date" id="sprinklerLastCheck" value="${esc(b.sprinklerLastCheck || "")}" />
+          </div>
+          <div>
+            <label>Score (1-10)</label>
+            <input type="number" min="1" max="10" step="1" id="sprinklerScore" value="${esc(b.sprinklerScore || "")}" placeholder="1-10" />
+          </div>
+        </div>
+        <p class="muted" style="font-size:13px; margin-top:6px;">Mangler info? Se <a href="https://fgkontroll.no/" target="_blank" rel="noopener">fgkontroll.no</a>.</p>
+      </div>
     </details>
   `;
 
@@ -1254,6 +1272,21 @@ function renderProtectionMeasures(){
       saveBuild();
     });
   });
+
+  const sprinklerDate = $("sprinklerLastCheck");
+  if(sprinklerDate){
+    sprinklerDate.addEventListener("input", () => {
+      b.sprinklerLastCheck = sprinklerDate.value;
+      saveBuild();
+    });
+  }
+  const sprinklerScore = $("sprinklerScore");
+  if(sprinklerScore){
+    sprinklerScore.addEventListener("input", () => {
+      b.sprinklerScore = sprinklerScore.value;
+      saveBuild();
+    });
+  }
 }
 
 function openProtectionPicker(){
@@ -2588,6 +2621,11 @@ function renderConstructionMaterialsReport(bld) {
         return p ? p.label : code;
       }).filter(Boolean).sort();
       html += `<p><strong>Beskyttelse:</strong> ${esc(labels.join(", "))}</p>\n`;
+      if(bld.protectionMeasures.includes("S")){
+        const date = bld.sprinklerLastCheck || "—";
+        const score = bld.sprinklerScore || "—";
+        html += `<p><em>Sprinkleranlegg:</em> Siste kontroll ${esc(date)} • Score ${esc(score)}</p>\n`;
+      }
     }
   } else {
     if (hasLegacyPerPart) {
@@ -2625,6 +2663,11 @@ function renderConstructionMaterialsReport(bld) {
         return p ? p.label : code;
       }).sort();
       html += `<p><strong>Beskyttelse:</strong> ${esc(protectionLabels.join(", "))}</p>\n`;
+      if (bld.protection.includes("S")) {
+        const date = bld.sprinklerLastCheck || "—";
+        const score = bld.sprinklerScore || "—";
+        html += `<p><em>Sprinkleranlegg:</em> Siste kontroll ${esc(date)} • Score ${esc(score)}</p>\n`;
+      }
     }
   }
 
