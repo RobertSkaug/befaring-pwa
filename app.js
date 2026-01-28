@@ -935,8 +935,46 @@ function renderActiveBuildingFields(){
   $("buildingNo").value = b.buildingNo || "";
   $("businessManual").value = "";
 
-  renderConstructionMaterials();
-  renderProtectionMeasures();
+  const isSelected = (code) => b.protectionMeasures.includes(code);
+
+  const chips = PROTECTION.map(p => {
+    const active = isSelected(p.code);
+    return `
+      <button type="button" class="construction-chip ${active ? "construction-chip--protection" : ""}" data-prot-code="${p.code}">
+        ${esc(p.label)}
+      </button>
+    `;
+  }).join("");
+
+  container.innerHTML = `
+    <details class="card" style="padding:12px;">
+      <summary style="display:flex; align-items:center; justify-content:space-between; gap:8px; cursor:pointer;">
+        <span style="font-weight:600;">Beskyttelse</span>
+        <span class="muted" style="font-size:12px;">${b.protectionMeasures.length ? `${b.protectionMeasures.length} valgt` : "Ingen valgt"}</span>
+      </summary>
+
+      <div style="margin-top:10px; display:flex; flex-wrap:wrap; gap:8px;">
+        ${chips}
+      </div>
+
+      <div id="protectionExtraFields" style="margin-top:16px;"></div>
+    </details>
+  `;
+
+  renderProtectionExtraFields();
+
+  container.querySelectorAll("[data-prot-code]").forEach(btn => {
+    btn.addEventListener("click", () => {
+      const code = btn.getAttribute("data-prot-code");
+      if(isSelected(code)){
+        b.protectionMeasures = b.protectionMeasures.filter(x => x !== code);
+      } else {
+        b.protectionMeasures.push(code);
+      }
+      renderProtectionMeasures();
+      saveBuild();
+    });
+  });
   renderAddressSuggestions([]);
   renderBusinessSuggestions([]);
   $("businessStatus").textContent = "";
