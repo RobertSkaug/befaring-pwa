@@ -142,7 +142,7 @@
     </div>
     <div class="btn-row" style="margin-top:10px;">
       <!-- Integrasjon: manuell lagring (kun hvis kunde er satt) -->
-      <button class="btn btn--secondary" id="btnSaveDraft">Lagre befaring</button>
+      <button class="btn btn--secondary" data-save-draft>Lagre befaring</button>
     </div>
   </section>
 
@@ -312,11 +312,15 @@
 
     <div class="btn-row">
       <button class="btn btn--chip" id="btnAddBuilding">+ Nytt bygg</button>
+      <!-- Integrasjon: manuell lagring (kun hvis kunde er satt) -->
+      <button class="btn btn--secondary" data-save-draft>Lagre befaring</button>
     </div>
 
     <div class="mobile-actionbar">
       <div class="btn-row">
         <button class="btn btn--secondary" id="btnToFindings">Registrer avvik/anbefaling</button>
+        <!-- Integrasjon: manuell lagring (kun hvis kunde er satt) -->
+        <button class="btn btn--secondary" data-save-draft>Lagre befaring</button>
       </div>
     </div>
   </section>
@@ -378,6 +382,8 @@
     <div class="mobile-actionbar">
       <div class="btn-row">
         <button class="btn btn--primary" id="btnAddFinding">Lagre avvik anbefaling</button>
+        <!-- Integrasjon: manuell lagring (kun hvis kunde er satt) -->
+        <button class="btn btn--secondary" data-save-draft>Lagre befaring</button>
       </div>
     </div>
 
