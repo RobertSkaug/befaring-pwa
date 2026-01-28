@@ -1,0 +1,147 @@
+<!doctype html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1" />
+  <title>Lagrede befaringer</title>
+  <link rel="stylesheet" href="./styles.css">
+  <style>
+    .page { max-width: 1100px; margin: 16px auto; padding: 0 12px; }
+    .filter-box { background:#fff; padding:16px; border-radius:8px; box-shadow:0 2px 6px rgba(0,0,0,0.08); margin-bottom:16px; }
+    .list { display:flex; flex-direction:column; gap:12px; }
+    .card-row { background:#fff; border-radius:8px; padding:16px; box-shadow:0 1px 4px rgba(0,0,0,0.08); }
+    .card-row h3 { margin:0 0 4px 0; }
+    .muted { color:#666; }
+    .tags { display:flex; flex-wrap:wrap; gap:6px; margin-top:8px; }
+    .tag { background:#eef2f7; color:#2f3b52; padding:4px 10px; border-radius:999px; font-size:12px; }
+    .stats { display:flex; gap:12px; flex-wrap:wrap; margin:12px 0; }
+    .stat { background:#fff; padding:12px 14px; border-radius:8px; box-shadow:0 1px 4px rgba(0,0,0,0.08); min-width:160px; }
+    .stat .num { font-size:22px; font-weight:700; }
+  </style>
+</head>
+<body>
+  <header class="header">
+    <div class="wrap header__bar">
+      <div class="brand">
+        <div class="logo">B</div>
+        <div>
+          <div class="t1">Befaringsrapport</div>
+          <div class="t2">Lagrede befaringer</div>
+        </div>
+      </div>
+      <div class="actions">
+        <button class="btn btn--tertiary" onclick="window.location.href='index.html'">← Til app</button>
+      </div>
+    </div>
+  </header>
+
+  <main class="page">
+    <div class="stats" id="stats"></div>
+
+    <div class="filter-box">
+      <div class="row">
+        <div>
+          <label>Søk</label>
+          <input id="search" placeholder="Kundenavn, adresse, orgnr" />
+        </div>
+        <div>
+          <label>Fra dato</label>
+          <input id="dateFrom" type="date" />
+        </div>
+        <div>
+          <label>Til dato</label>
+          <input id="dateTo" type="date" />
+        </div>
+      </div>
+    </div>
+
+    <div class="list" id="list"></div>
+  </main>
+
+<script>
+function esc(s){ return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c])); }
+
+function loadInspections(){
+  return JSON.parse(localStorage.getItem('savedInspections')||'[]');
+}
+
+function renderStats(list){
+  const total = list.length;
+  const totalItems = list.reduce((s,x)=> s + (x.items?.length||x.findings?.length||0), 0);
+  document.getElementById('stats').innerHTML = `
+    <div class="stat"><div class="num">${total}</div><div>befaringer</div></div>
+    <div class="stat"><div class="num">${totalItems}</div><div>registrerte punkt</div></div>
+  `;
+}
+
+function applyFilters(list){
+  const search = document.getElementById('search').value.toLowerCase();
+  const dateFrom = document.getElementById('dateFrom').value;
+  const dateTo = document.getElementById('dateTo').value;
+
+  return list.filter(insp => {
+    const loc = insp.locations?.[0] || {};
+    const addr = loc.address || '';
+    const obj = loc.objectName || '';
+    const matchesSearch = !search ||
+      (insp.customer?.name||'').toLowerCase().includes(search) ||
+      (insp.customer?.orgnr||'').includes(search) ||
+      addr.toLowerCase().includes(search) ||
+      obj.toLowerCase().includes(search);
+
+    const inspDate = insp.inspectionDate ? new Date(insp.inspectionDate) : null;
+    const fromDate = dateFrom ? new Date(dateFrom) : null;
+    const toDate = dateTo ? new Date(dateTo) : null;
+
+    let matchesDate = true;
+    if(inspDate){
+      if(fromDate && inspDate < fromDate) matchesDate = false;
+      if(toDate && inspDate > toDate) matchesDate = false;
+    }
+
+    return matchesSearch && matchesDate;
+  });
+}
+
+function renderList(list){
+  const root = document.getElementById('list');
+  if(!list.length){
+    root.innerHTML = '<div class="card-row"><p class="muted">Ingen lagrede befaringer funnet i denne nettleseren.</p></div>';
+    return;
+  }
+
+  root.innerHTML = list.map(insp => {
+    const loc = insp.locations?.[0] || {};
+    const itemsCount = insp.items?.length || insp.findings?.length || 0;
+    const status = insp.status ? (insp.status === 'avsluttet' ? '✅ Avsluttet' : '📝 Påbegynt') : '—';
+    return `
+      <div class="card-row">
+        <h3>${esc(insp.customer?.name||'Ukjent kunde')}</h3>
+        <div class="muted">Dato: ${esc(insp.inspectionDate||'—')} • Org.nr: ${esc(insp.customer?.orgnr||'—')} • ${status}</div>
+        <div class="muted">Bygg: ${esc(loc.objectName||'—')}</div>
+        <div class="muted">Adresse: ${esc(loc.address||'—')}</div>
+        <div class="tags">
+          <span class="tag">Punkter: ${itemsCount}</span>
+        </div>
+      </div>
+    `;
+  }).join('');
+}
+
+function init(){
+  const list = loadInspections();
+  renderStats(list);
+
+  const rerender = ()=> renderList(applyFilters(loadInspections()));
+  ['search','dateFrom','dateTo'].forEach(id=>{
+    document.getElementById(id).addEventListener('input', rerender);
+    document.getElementById(id).addEventListener('change', rerender);
+  });
+
+  renderList(applyFilters(list));
+}
+
+init();
+</script>
+</body>
+</html>
