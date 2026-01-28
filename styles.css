@@ -58,7 +58,6 @@ body{margin:0; font-family: system-ui,-apple-system,Segoe UI,Roboto,Arial,sans-s
 .header__bar{display:flex; align-items:center; justify-content:space-between; gap:12px; padding: 12px 0;}
 .brand{display:flex; align-items:center; gap:10px;}
 .logo{width:36px; height:36px; border-radius:12px; background:var(--g); color:#fff; display:grid; place-items:center; font-weight:900;}
-.logo-img{width:36px; height:36px; border-radius:12px; object-fit:cover; border:1px solid var(--b);}
 .t1{font-weight:900; font-size:14px;}
 .t2{color:var(--mut); font-size:12px;}
 .actions{display:flex; gap:10px; flex-wrap:wrap; justify-content:flex-end}
