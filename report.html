@@ -161,10 +161,9 @@ function renderReport(){
 
     const markers = (loc.buildings || []).filter(b => b.geo?.lat && b.geo?.lng)
       .map(b => ({ lat: b.geo.lat, lng: b.geo.lng, color: "red-pushpin" }));
-    const center = loc.mapView?.center
-      || (markers[0] ? { lat: markers[0].lat, lng: markers[0].lng } : null)
+    const center = (markers[0] ? { lat: markers[0].lat, lng: markers[0].lng } : null)
       || (loc.geo?.lat && loc.geo?.lng ? { lat: loc.geo.lat, lng: loc.geo.lng } : null);
-    const zoom = loc.mapView?.zoom || 18;
+    const zoom = 18;
     const mapUrl = loc.mapSnapshot || (center ? staticMapUrl({ center, zoom, markers }) : '');
 
     const buildingsHtml = (loc.buildings || []).map((b, bIdx) => {

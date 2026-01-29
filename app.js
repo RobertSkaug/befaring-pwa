@@ -136,26 +136,6 @@ function loadHtml2Canvas(){
   return html2canvasLoading;
 }
 
-const LEGACY_MATERIALS = [
-  { code:"B", label:"Betong" },
-  { code:"S", label:"Stål" },
-  { code:"T", label:"Tre" },
-  { code:"M", label:"Mur" },
-  { code:"U", label:"Ubrennbar isolasjon" },
-  { code:"C", label:"Brennbar isolasjon" }
-];
-function getMaterialConfig(){
-  return window.MaterialConfig || { buildingParts: [], materialLabels: {} };
-}
-const PROTECTION = [
-  { code:"S", label:"Sprinkleranlegg" },
-  { code:"A", label:"Brannalarmanlegg" },
-  { code:"I", label:"Innbruddsalarmanlegg" },
-  { code:"G", label:"Gasslokkeanlegg" },
-  { code:"R", label:"Røykventilasjon" },
-  { code:"D", label:"Delvis beskyttelse" }
-];
-
 const CONSTR_COL = [
   { code:"BETONG", label:"Betong" },
   { code:"STÅL", label:"Stål" },
@@ -292,7 +272,6 @@ function newLocation(id){
     address:"",
     objectName:"",
     geo:{ lat:null, lng:null, accuracy:null, ts:null },
-    mapView: null,
     mapSnapshot: null,
 
     buildings: [ newBuilding(`B-${id}-1`) ],
@@ -366,18 +345,8 @@ function init(){
   $("address").addEventListener("input", e => { getActiveLocation().address = e.target.value; renderLocationTabs(); });
 
   $("btnGPS").addEventListener("click", getGPS);
-  const centerMapBtn = $("btnCenterMap");
-  if(centerMapBtn) centerMapBtn.addEventListener("click", () => centerMapToActiveLocation());
-  const clearPinBtn = $("btnClearBuildingPin");
-  if(clearPinBtn) clearPinBtn.addEventListener("click", () => clearActiveBuildingPin());
-  const lockMapBtn = $("btnLockMapView");
-  if(lockMapBtn) lockMapBtn.addEventListener("click", () => lockLocationMapView());
-  const clearMapBtn = $("btnClearMapView");
-  if(clearMapBtn) clearMapBtn.addEventListener("click", () => clearLocationMapView());
   const captureMapBtn = $("btnCaptureMap");
   if(captureMapBtn) captureMapBtn.addEventListener("click", () => captureLocationMapSnapshot());
-  const clearMapImageBtn = $("btnClearMapImage");
-  if(clearMapImageBtn) clearMapImageBtn.addEventListener("click", () => clearLocationMapSnapshot());
 
   // Buildings
   $("btnAddBuilding").addEventListener("click", addBuilding);
@@ -1012,7 +981,6 @@ function renderActiveLocationFields(){
   initLocationMap();
   renderBuildingMapMarkers();
   updateBuildingPinStatus();
-  updateMapLockStatus();
   updateMapSnapshotStatus();
 
   renderAddressSuggestions([]);
@@ -1519,9 +1487,7 @@ function renderBuildingMapMarkers(){
 
   const activeLoc = getActiveLocation();
   const activeB = getActiveBuilding();
-  if(activeLoc?.mapView?.center){
-    locationMap.setView([activeLoc.mapView.center.lat, activeLoc.mapView.center.lng], activeLoc.mapView.zoom || 18);
-  } else if(activeB?.geo?.lat && activeB?.geo?.lng){
+  if(activeB?.geo?.lat && activeB?.geo?.lng){
     locationMap.setView([activeB.geo.lat, activeB.geo.lng], 18);
   } else if(markers.length > 0){
     const group = L.featureGroup(markers);
@@ -1619,38 +1585,6 @@ function updateBuildingPinStatus(){
   }).join("");
 }
 
-function lockLocationMapView(){
-  const loc = getActiveLocation();
-  if(!loc || !locationMap) return;
-  const center = locationMap.getCenter();
-  loc.mapView = { center: { lat: center.lat, lng: center.lng }, zoom: locationMap.getZoom() };
-  saveBuild();
-  updateMapLockStatus();
-}
-
-function clearLocationMapView(){
-  const loc = getActiveLocation();
-  if(!loc) return;
-  loc.mapView = null;
-  saveBuild();
-  updateMapLockStatus();
-}
-
-function updateMapLockStatus(){
-  const el = $("mapLockStatus");
-  if(!el) return;
-  const loc = getActiveLocation();
-  if(!loc){
-    el.textContent = "";
-    return;
-  }
-  if(loc.mapView?.center){
-    el.textContent = `Kartutsnitt låst til rapport (zoom ${loc.mapView.zoom})`;
-  } else {
-    el.textContent = "Kartutsnitt ikke låst (auto)";
-  }
-}
-
 async function captureLocationMapSnapshot(){
   const loc = getActiveLocation();
   if(!loc) return;
@@ -1710,13 +1644,12 @@ function getLocationMapData(loc, focusBld){
   const markers = (loc.buildings || []).filter(b => b.geo?.lat && b.geo?.lng)
     .map(b => ({ lat: b.geo.lat, lng: b.geo.lng, color: "red-pushpin" }));
 
-  const center = loc.mapView?.center
-    || (focusBld?.geo?.lat && focusBld?.geo?.lng ? { lat: focusBld.geo.lat, lng: focusBld.geo.lng } : null)
+  const center = (focusBld?.geo?.lat && focusBld?.geo?.lng ? { lat: focusBld.geo.lat, lng: focusBld.geo.lng } : null)
     || (markers[0] ? { lat: markers[0].lat, lng: markers[0].lng } : null)
     || (loc.geo?.lat && loc.geo?.lng ? { lat: loc.geo.lat, lng: loc.geo.lng } : null);
 
   if(!center) return null;
-  const zoom = loc.mapView?.zoom || 18;
+  const zoom = 18;
   return { center, zoom, markers };
 }
 
