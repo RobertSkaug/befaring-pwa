@@ -122,6 +122,20 @@ const staticMapUrl = ({ center, zoom = 18, width = 640, height = 360, markers = 
   return `https://staticmap.openstreetmap.de/staticmap.php?${params.toString()}`;
 };
 
+let html2canvasLoading = null;
+function loadHtml2Canvas(){
+  if(window.html2canvas) return Promise.resolve(true);
+  if(html2canvasLoading) return html2canvasLoading;
+  html2canvasLoading = new Promise((resolve) => {
+    const script = document.createElement("script");
+    script.src = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
+    script.onload = () => resolve(true);
+    script.onerror = () => resolve(false);
+    document.head.appendChild(script);
+  });
+  return html2canvasLoading;
+}
+
 const LEGACY_MATERIALS = [
   { code:"B", label:"Betong" },
   { code:"S", label:"Stål" },
@@ -1641,8 +1655,11 @@ async function captureLocationMapSnapshot(){
   const loc = getActiveLocation();
   if(!loc) return;
   if(!window.html2canvas){
-    alert("Kartbilde kan ikke lagres (html2canvas mangler).");
-    return;
+    const loaded = await loadHtml2Canvas();
+    if(!loaded || !window.html2canvas){
+      alert("Kartbilde kan ikke lagres (html2canvas mangler).");
+      return;
+    }
   }
   const mapEl = $("locationMap");
   if(!mapEl){
