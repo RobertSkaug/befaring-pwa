@@ -3353,7 +3353,7 @@ async function renderReportPreview() {
   }
 }
 
-async function printReport(reportHtml) {
+async function printReport(reportHtml, targetWindow) {
   // Fetch report.css og report-print.css som tekst (cache bust)
   const reportCss = await fetch("./report.css", { cache: "no-store" })
     .then(r => r.text())
@@ -3408,7 +3408,7 @@ async function printReport(reportHtml) {
   `;
 
   // Åpne nytt vindu og injiser CSS + HTML
-  const w = window.open("", "_blank");
+  const w = targetWindow || window.open("", "_blank");
   if (!w) {
     alert("Kunne ikke åpne vindu. Sjekk popup-blokkering.");
     return;
@@ -3426,8 +3426,13 @@ async function printReport(reportHtml) {
 }
 
 async function exportToPDF(){
+  const w = window.open("", "_blank");
+  if (!w) {
+    alert("Kunne ikke åpne vindu. Sjekk popup-blokkering.");
+    return;
+  }
   const html = await buildReportContent();
-  await printReport(html);
+  await printReport(html, w);
 }
 
 async function exportToWord(){
