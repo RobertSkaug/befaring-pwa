@@ -1281,8 +1281,8 @@ function renderProtectionMeasures(){
             <input type="date" id="sprinklerLastCheck" value="${esc(b.sprinklerLastCheck || "")}" />
           </div>
           <div>
-            <label>Score (1-10)</label>
-            <input type="number" min="1" max="10" step="1" id="sprinklerScore" value="${esc(b.sprinklerScore || "")}" placeholder="1-10" />
+            <label>Poeng (0-100)</label>
+            <input type="number" min="0" max="100" step="1" id="sprinklerScore" value="${esc(b.sprinklerScore || "")}" placeholder="0-100" />
           </div>
         </div>
         <p class="muted" style="font-size:13px; margin-top:6px;">Mangler info? Se <a href="https://fgkontroll.no/" target="_blank" rel="noopener">fgkontroll.no</a>.</p>
@@ -2892,7 +2892,7 @@ function renderConstructionMaterialsReport(bld) {
       if(bld.protectionMeasures.includes("S")){
         const date = bld.sprinklerLastCheck || "—";
         const score = bld.sprinklerScore || "—";
-        html += `<p><em>Sprinkleranlegg:</em> Siste kontroll ${esc(date)} • Score ${esc(score)}</p>\n`;
+        html += `<p><em>Sprinkleranlegg:</em> Siste kontroll ${esc(date)} • Poeng (0–100) ${esc(score)}</p>\n`;
       }
       if(bld.protectionMeasures.includes("A")){
         const conn = bld.fireAlarmConnected || "—";
@@ -2938,7 +2938,7 @@ function renderConstructionMaterialsReport(bld) {
       if (bld.protection.includes("S")) {
         const date = bld.sprinklerLastCheck || "—";
         const score = bld.sprinklerScore || "—";
-        html += `<p><em>Sprinkleranlegg:</em> Siste kontroll ${esc(date)} • Score ${esc(score)}</p>\n`;
+        html += `<p><em>Sprinkleranlegg:</em> Siste kontroll ${esc(date)} • Poeng (0–100) ${esc(score)}</p>\n`;
       }
       if (bld.protection.includes("A")) {
         const conn = bld.fireAlarmConnected || "—";
