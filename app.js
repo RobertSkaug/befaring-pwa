@@ -1457,37 +1457,54 @@ function clearActiveBuildingPin(){
 
 function renderBuildingMapMarkers(){
   if(!locationMap) return;
-  const loc = getActiveLocation();
 
   Object.values(locationMapMarkers).forEach(m => locationMap.removeLayer(m));
   locationMapMarkers = {};
-  if(!loc) return;
 
-  (loc.buildings || []).forEach((b, idx) => {
-    if(b.geo?.lat && b.geo?.lng){
-      const marker = L.marker([b.geo.lat, b.geo.lng]).addTo(locationMap);
-      marker.bindTooltip(buildingShortLabel(b, idx), { permanent: true, direction: "top", offset: [0, -12] });
-      locationMapMarkers[b.id] = marker;
-    }
+  const markers = [];
+  state.locations.forEach((loc, locIdx) => {
+    (loc.buildings || []).forEach((b, bIdx) => {
+      if(b.geo?.lat && b.geo?.lng){
+        const marker = L.marker([b.geo.lat, b.geo.lng]).addTo(locationMap);
+        const locLabel = shortLabel(loc, locIdx);
+        const bLabel = buildingShortLabel(b, bIdx);
+        marker.bindTooltip(`${locLabel} – ${bLabel}`, { permanent: true, direction: "top", offset: [0, -12] });
+        locationMapMarkers[`${loc.id}:${b.id}`] = marker;
+        markers.push(marker);
+      }
+    });
   });
 
-  centerMapToActiveLocation();
+  const activeLoc = getActiveLocation();
+  const activeB = getActiveBuilding();
+  if(activeB?.geo?.lat && activeB?.geo?.lng){
+    locationMap.setView([activeB.geo.lat, activeB.geo.lng], 18);
+  } else if(markers.length > 0){
+    const group = L.featureGroup(markers);
+    locationMap.fitBounds(group.getBounds().pad(0.2));
+  } else if(activeLoc?.geo?.lat && activeLoc?.geo?.lng){
+    locationMap.setView([activeLoc.geo.lat, activeLoc.geo.lng], 17);
+  }
 }
 
 function updateBuildingPinStatus(){
   const root = $("buildingPinStatus");
   if(!root) return;
-  const loc = getActiveLocation();
-  if(!loc){
-    root.innerHTML = "";
-    return;
-  }
 
-  root.innerHTML = (loc.buildings || []).map((b, idx) => {
-    const label = esc(buildingShortLabel(b, idx));
-    const hasPin = b.geo?.lat && b.geo?.lng;
-    const coords = hasPin ? `${b.geo.lat.toFixed(5)}, ${b.geo.lng.toFixed(5)}` : "Ikke plassert";
-    return `<div class="pin-row"><strong>${label}</strong><div>${coords}</div></div>`;
+  root.innerHTML = state.locations.map((loc, locIdx) => {
+    const locLabel = esc(shortLabel(loc, locIdx));
+    const rows = (loc.buildings || []).map((b, bIdx) => {
+      const label = esc(buildingShortLabel(b, bIdx));
+      const hasPin = b.geo?.lat && b.geo?.lng;
+      const coords = hasPin ? `${b.geo.lat.toFixed(5)}, ${b.geo.lng.toFixed(5)}` : "Ikke plassert";
+      return `<div class="pin-row"><strong>${label}</strong><div>${coords}</div></div>`;
+    }).join("");
+    return `
+      <div>
+        <div class="muted" style="margin:6px 0; font-weight:600;">${locLabel}</div>
+        <div class="map-pin-status__grid">${rows}</div>
+      </div>
+    `;
   }).join("");
 }
 
@@ -2090,10 +2107,8 @@ async function buildReportHtml(){
 <p><strong>Bygningsnummer:</strong> ${buildingNo}</p>
 ${mapHtml}
 
-<p><strong>Virksomhet i bygg:</strong></p>
-${businessHtml}
-
-${areaHtml}
+    <p><strong>Totalareal:</strong> ${totalArea}</p>
+    ${bizAreaHtml}
 
 <p><strong>Byggeår:</strong> ${buildYear}</p>
 <p><strong>Antall etasjer:</strong> ${floors}</p>

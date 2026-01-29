@@ -306,11 +306,15 @@ input, select, textarea{
 }
 
 .map-pin-status {
+  display: block;
+  font-size: 12px;
+  color: #555;
+}
+
+.map-pin-status__grid {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
   gap: 8px 12px;
-  font-size: 12px;
-  color: #555;
 }
 
 .map-pin-status .pin-row {
