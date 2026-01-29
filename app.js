@@ -279,6 +279,7 @@ function newLocation(id){
     objectName:"",
     geo:{ lat:null, lng:null, accuracy:null, ts:null },
     mapView: null,
+    mapSnapshot: null,
 
     buildings: [ newBuilding(`B-${id}-1`) ],
     activeBuildingId: `B-${id}-1`
@@ -359,6 +360,10 @@ function init(){
   if(lockMapBtn) lockMapBtn.addEventListener("click", () => lockLocationMapView());
   const clearMapBtn = $("btnClearMapView");
   if(clearMapBtn) clearMapBtn.addEventListener("click", () => clearLocationMapView());
+  const captureMapBtn = $("btnCaptureMap");
+  if(captureMapBtn) captureMapBtn.addEventListener("click", () => captureLocationMapSnapshot());
+  const clearMapImageBtn = $("btnClearMapImage");
+  if(clearMapImageBtn) clearMapImageBtn.addEventListener("click", () => clearLocationMapSnapshot());
 
   // Buildings
   $("btnAddBuilding").addEventListener("click", addBuilding);
@@ -994,6 +999,7 @@ function renderActiveLocationFields(){
   renderBuildingMapMarkers();
   updateBuildingPinStatus();
   updateMapLockStatus();
+  updateMapSnapshotStatus();
 
   renderAddressSuggestions([]);
   renderBusinessSuggestions([]);
@@ -1428,7 +1434,8 @@ function initLocationMap(){
   locationMap = L.map(mapEl, { zoomControl: true });
   L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
     maxZoom: 20,
-    attribution: "© OpenStreetMap"
+    attribution: "© OpenStreetMap",
+    crossOrigin: true
   }).addTo(locationMap);
 
   locationMapLabelLayer = L.layerGroup().addTo(locationMap);
@@ -1627,6 +1634,57 @@ function updateMapLockStatus(){
     el.textContent = `Kartutsnitt låst til rapport (zoom ${loc.mapView.zoom})`;
   } else {
     el.textContent = "Kartutsnitt ikke låst (auto)";
+  }
+}
+
+async function captureLocationMapSnapshot(){
+  const loc = getActiveLocation();
+  if(!loc) return;
+  if(!window.html2canvas){
+    alert("Kartbilde kan ikke lagres (html2canvas mangler).");
+    return;
+  }
+  const mapEl = $("locationMap");
+  if(!mapEl){
+    alert("Kartet er ikke tilgjengelig.");
+    return;
+  }
+
+  try {
+    const canvas = await window.html2canvas(mapEl, {
+      useCORS: true,
+      allowTaint: true,
+      backgroundColor: "#ffffff"
+    });
+    loc.mapSnapshot = canvas.toDataURL("image/png");
+    saveBuild();
+    updateMapSnapshotStatus();
+  } catch (e){
+    console.error(e);
+    alert("Kunne ikke lagre kartbildet. Prøv igjen.");
+  }
+}
+
+function clearLocationMapSnapshot(){
+  const loc = getActiveLocation();
+  if(!loc) return;
+  loc.mapSnapshot = null;
+  saveBuild();
+  updateMapSnapshotStatus();
+}
+
+function updateMapSnapshotStatus(){
+  const el = $("mapSnapshotStatus");
+  if(!el) return;
+  const loc = getActiveLocation();
+  if(!loc){
+    el.textContent = "";
+    return;
+  }
+  if(loc.mapSnapshot){
+    el.textContent = "Kartbilde lagret for rapport.";
+  } else {
+    el.textContent = "Kartbilde ikke lagret (bruker automatisk kart).";
   }
 }
 
@@ -2169,8 +2227,7 @@ async function buildReportHtml(){
       const label = esc(bld.label || "Bygg");
       const addr = esc(loc.address || "—");
       const buildingNo = esc(bld.buildingNo || "—");
-      const mapData = getLocationMapData(loc, bld);
-      const mapUrl = mapData ? staticMapUrl(mapData) : "";
+      const mapUrl = loc.mapSnapshot || (getLocationMapData(loc, bld) ? staticMapUrl(getLocationMapData(loc, bld)) : "");
       const mapHtml = mapUrl ? `
 <div class="report__map">
   <img src="${mapUrl}" alt="Kart for ${label}" referrerpolicy="no-referrer">
@@ -3054,8 +3111,7 @@ async function buildReportContent() {
       const label = esc(bld.label || "Bygg");
       const addr = esc(loc.address || "—");
       const buildingNo = esc(bld.buildingNo || "—");
-      const mapData = getLocationMapData(loc, bld);
-      const mapUrl = mapData ? staticMapUrl(mapData) : "";
+      const mapUrl = loc.mapSnapshot || (getLocationMapData(loc, bld) ? staticMapUrl(getLocationMapData(loc, bld)) : "");
       const mapHtml = mapUrl ? `
 <div class="report__map">
   <img src="${mapUrl}" alt="Kart for ${label}" referrerpolicy="no-referrer">

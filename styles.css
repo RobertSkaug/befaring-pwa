@@ -350,6 +350,14 @@ input, select, textarea{
   color: #555;
 }
 
+.map-snapshot-preview {
+  margin-top: 8px;
+  border: 1px dashed #ddd;
+  border-radius: 6px;
+  padding: 6px;
+  background: #fafafa;
+}
+
 .report__building-meta {
   font-family: Arial, sans-serif;
   font-size: 10pt;
