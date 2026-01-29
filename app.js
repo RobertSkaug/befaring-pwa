@@ -2023,14 +2023,6 @@ async function buildReportHtml(){
       <div class="report__map-caption">📍 ${label} – ${bld.geo.lat.toFixed(5)}, ${bld.geo.lng.toFixed(5)}</div>
     </div>
     ` : "";
-      const hasGeo = bld.geo?.lat && bld.geo?.lng;
-      const mapUrl = hasGeo ? staticMapUrl(bld.geo.lat, bld.geo.lng) : "";
-      const mapHtml = hasGeo ? `
-    <div class="report__map">
-      <img src="${mapUrl}" alt="Kart for ${label}">
-      <div class="report__map-caption">📍 ${label} – ${bld.geo.lat.toFixed(5)}, ${bld.geo.lng.toFixed(5)}</div>
-    </div>
-    ` : "";
       
       // Virksomhet (flere valgt) - vis som punktliste
       let businessHtml = "";
