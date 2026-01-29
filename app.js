@@ -1414,10 +1414,9 @@ function initLocationMap(){
   if(locationMap) return;
 
   locationMap = L.map(mapEl, { zoomControl: true });
-  L.tileLayer("https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png", {
+  L.tileLayer("https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png", {
     maxZoom: 20,
-    attribution: "© OpenStreetMap © CARTO",
-    crossOrigin: true
+    attribution: "© OpenStreetMap, HOT"
   }).addTo(locationMap);
 
   locationMapLabelLayer = L.layerGroup().addTo(locationMap);
