@@ -109,6 +109,10 @@ let state = {
 const $ = (id) => document.getElementById(id);
 const digits = (s) => (s||"").replace(/\D+/g,"");
 const esc = (s) => String(s??"").replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
+const staticMapUrl = (lat, lng, zoom = 18, w = 700, h = 360) => {
+  const center = `${lat},${lng}`;
+  return `https://staticmap.openstreetmap.de/staticmap.php?center=${center}&zoom=${zoom}&size=${w}x${h}&markers=${center},red-pushpin`;
+};
 
 const LEGACY_MATERIALS = [
   { code:"B", label:"Betong" },
@@ -218,6 +222,8 @@ function newBuilding(id){
     label: "",        // Byggbeskrivelse (blir heading)
     buildingNo: "",   // Bygningsnummer
     businessInBuilding: [],
+
+    geo: { lat: null, lng: null },
 
     buildYear:"",
     areaM2:"",
@@ -336,6 +342,10 @@ function init(){
   $("address").addEventListener("input", e => { getActiveLocation().address = e.target.value; renderLocationTabs(); });
 
   $("btnGPS").addEventListener("click", getGPS);
+  const centerMapBtn = $("btnCenterMap");
+  if(centerMapBtn) centerMapBtn.addEventListener("click", () => centerMapToActiveLocation());
+  const clearPinBtn = $("btnClearBuildingPin");
+  if(clearPinBtn) clearPinBtn.addEventListener("click", () => clearActiveBuildingPin());
 
   // Buildings
   $("btnAddBuilding").addEventListener("click", addBuilding);
@@ -345,6 +355,8 @@ function init(){
     b.label = e.target.value;
     renderBuildingTabs();
     renderFindingLocationSelect();
+    renderBuildingMapMarkers();
+    updateBuildingPinStatus();
   });
 
   $("buildingNo").addEventListener("input", e => {
@@ -932,6 +944,8 @@ function renderActiveBuildingFields(){
   renderProtectionMeasures();
   renderBusinessSelected();
   renderAreaBreakdown();
+  renderBuildingMapMarkers();
+  updateBuildingPinStatus();
 }
 
 function renderLocationTabs(){
@@ -962,6 +976,10 @@ function renderActiveLocationFields(){
 
   renderBuildingTabs();
   renderActiveBuildingFields();
+
+  initLocationMap();
+  renderBuildingMapMarkers();
+  updateBuildingPinStatus();
 
   renderAddressSuggestions([]);
   renderBusinessSuggestions([]);
@@ -1381,6 +1399,99 @@ function renderChipGroup(containerId, options, selectedArr, onToggle){
 }
 
 /* =========================
+   Map: building pinning
+========================= */
+let locationMap = null;
+let locationMapMarkers = {};
+
+function initLocationMap(){
+  const mapEl = $("locationMap");
+  if(!mapEl || !window.L) return;
+  if(locationMap) return;
+
+  locationMap = L.map(mapEl, { zoomControl: true });
+  L.tileLayer("https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png", {
+    maxZoom: 20,
+    attribution: "© OpenStreetMap"
+  }).addTo(locationMap);
+
+  locationMap.setView([59.9139, 10.7522], 12);
+
+  locationMap.on("click", (e) => {
+    const b = getActiveBuilding();
+    if(!b) return;
+    if(!b.geo) b.geo = { lat: null, lng: null };
+    b.geo.lat = e.latlng.lat;
+    b.geo.lng = e.latlng.lng;
+    saveBuild();
+    renderBuildingMapMarkers();
+    updateBuildingPinStatus();
+  });
+
+  setTimeout(() => locationMap.invalidateSize(), 60);
+}
+
+function centerMapToActiveLocation(){
+  if(!locationMap) return;
+  const loc = getActiveLocation();
+  const b = getActiveBuilding();
+
+  if(b?.geo?.lat && b?.geo?.lng){
+    locationMap.setView([b.geo.lat, b.geo.lng], 18);
+    return;
+  }
+  if(loc?.geo?.lat && loc?.geo?.lng){
+    locationMap.setView([loc.geo.lat, loc.geo.lng], 17);
+  }
+}
+
+function clearActiveBuildingPin(){
+  const b = getActiveBuilding();
+  if(!b || !b.geo) return;
+  b.geo.lat = null;
+  b.geo.lng = null;
+  saveBuild();
+  renderBuildingMapMarkers();
+  updateBuildingPinStatus();
+}
+
+function renderBuildingMapMarkers(){
+  if(!locationMap) return;
+  const loc = getActiveLocation();
+
+  Object.values(locationMapMarkers).forEach(m => locationMap.removeLayer(m));
+  locationMapMarkers = {};
+  if(!loc) return;
+
+  (loc.buildings || []).forEach((b, idx) => {
+    if(b.geo?.lat && b.geo?.lng){
+      const marker = L.marker([b.geo.lat, b.geo.lng]).addTo(locationMap);
+      marker.bindTooltip(buildingShortLabel(b, idx), { permanent: true, direction: "top", offset: [0, -12] });
+      locationMapMarkers[b.id] = marker;
+    }
+  });
+
+  centerMapToActiveLocation();
+}
+
+function updateBuildingPinStatus(){
+  const root = $("buildingPinStatus");
+  if(!root) return;
+  const loc = getActiveLocation();
+  if(!loc){
+    root.innerHTML = "";
+    return;
+  }
+
+  root.innerHTML = (loc.buildings || []).map((b, idx) => {
+    const label = esc(buildingShortLabel(b, idx));
+    const hasPin = b.geo?.lat && b.geo?.lng;
+    const coords = hasPin ? `${b.geo.lat.toFixed(5)}, ${b.geo.lng.toFixed(5)}` : "Ikke plassert";
+    return `<div class="pin-row"><strong>${label}</strong><div>${coords}</div></div>`;
+  }).join("");
+}
+
+/* =========================
    GPS -> Address suggestions
 ========================= */
 function cacheKey(lat,lng){
@@ -1412,6 +1523,8 @@ function getGPS(){
       $("gpsStatus").textContent =
         `GPS: ${loc.geo.lat.toFixed(5)}, ${loc.geo.lng.toFixed(5)} (±${Math.round(loc.geo.accuracy)}m)`;
       renderAddressSuggestions(list);
+      centerMapToActiveLocation();
+      renderBuildingMapMarkers();
     } catch {
       $("gpsStatus").textContent =
         `GPS: ${loc.geo.lat.toFixed(5)}, ${loc.geo.lng.toFixed(5)} (±${Math.round(loc.geo.accuracy)}m)`;
@@ -1902,6 +2015,22 @@ async function buildReportHtml(){
       const label = esc(bld.label || "Bygg");
       const addr = esc(loc.address || "—");
       const buildingNo = esc(bld.buildingNo || "—");
+      const hasGeo = bld.geo?.lat && bld.geo?.lng;
+      const mapUrl = hasGeo ? staticMapUrl(bld.geo.lat, bld.geo.lng) : "";
+      const mapHtml = hasGeo ? `
+    <div class="report__map">
+      <img src="${mapUrl}" alt="Kart for ${label}">
+      <div class="report__map-caption">📍 ${label} – ${bld.geo.lat.toFixed(5)}, ${bld.geo.lng.toFixed(5)}</div>
+    </div>
+    ` : "";
+      const hasGeo = bld.geo?.lat && bld.geo?.lng;
+      const mapUrl = hasGeo ? staticMapUrl(bld.geo.lat, bld.geo.lng) : "";
+      const mapHtml = hasGeo ? `
+    <div class="report__map">
+      <img src="${mapUrl}" alt="Kart for ${label}">
+      <div class="report__map-caption">📍 ${label} – ${bld.geo.lat.toFixed(5)}, ${bld.geo.lng.toFixed(5)}</div>
+    </div>
+    ` : "";
       
       // Virksomhet (flere valgt) - vis som punktliste
       let businessHtml = "";
@@ -1967,6 +2096,7 @@ async function buildReportHtml(){
 <h3>${label}</h3>
 <p><strong>Adresse:</strong> ${addr}</p>
 <p><strong>Bygningsnummer:</strong> ${buildingNo}</p>
+${mapHtml}
 
 <p><strong>Virksomhet i bygg:</strong></p>
 ${businessHtml}
@@ -2301,6 +2431,28 @@ body {
   font-size: 10pt;
   line-height: 1.5;
   margin: 12px 0 24px 0;
+}
+
+.report__map {
+  margin: 10px 0 12px 0;
+  border: 1px solid #ddd;
+  border-radius: 3px;
+  overflow: hidden;
+  background: #f7f7f7;
+}
+
+.report__map img {
+  width: 100%;
+  height: auto;
+  display: block;
+}
+
+.report__map-caption {
+  font-family: Arial, sans-serif;
+  font-size: 9.5pt;
+  padding: 6px 8px;
+  background: #f0f0f0;
+  color: #333;
 }
 
 .report__building-meta p {
@@ -2823,6 +2975,7 @@ async function buildReportContent() {
 <h3>${label}</h3>
 <p><strong>Adresse:</strong> ${addr}</p>
 <p><strong>Bygningsnummer:</strong> ${buildingNo}</p>
+${mapHtml}
 <p><strong>Totalareal:</strong> ${totalArea}</p>
 
 ${bizAreaHtml}
