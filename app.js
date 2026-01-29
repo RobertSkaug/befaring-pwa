@@ -1407,6 +1407,25 @@ let locationMap = null;
 let locationMapMarkers = {};
 let locationMapLabelLayer = null;
 let locationMapLineLayer = null;
+let locationMapTileLayer = null;
+let locationMapTileProviderIndex = 0;
+let locationMapTileErrorCount = 0;
+let locationMapTileErrorTimer = null;
+
+const MAP_TILE_PROVIDERS = [
+  {
+    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
+    attribution: "© OpenStreetMap"
+  },
+  {
+    url: "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
+    attribution: "© OpenStreetMap, HOT"
+  },
+  {
+    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
+    attribution: "© OpenStreetMap © CARTO"
+  }
+];
 
 function initLocationMap(){
   const mapEl = $("locationMap");
@@ -1414,10 +1433,7 @@ function initLocationMap(){
   if(locationMap) return;
 
   locationMap = L.map(mapEl, { zoomControl: true });
-  L.tileLayer("https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png", {
-    maxZoom: 20,
-    attribution: "© OpenStreetMap, HOT"
-  }).addTo(locationMap);
+  setMapTileProvider(0);
 
   locationMapLabelLayer = L.layerGroup().addTo(locationMap);
   locationMapLineLayer = L.layerGroup().addTo(locationMap);
@@ -1439,6 +1455,31 @@ function initLocationMap(){
   locationMap.on("moveend", () => renderMapLabels());
 
   setTimeout(() => locationMap.invalidateSize(), 60);
+}
+
+function setMapTileProvider(index){
+  if(!locationMap) return;
+  const provider = MAP_TILE_PROVIDERS[index];
+  if(!provider) return;
+  if(locationMapTileLayer) locationMap.removeLayer(locationMapTileLayer);
+  locationMapTileProviderIndex = index;
+  locationMapTileErrorCount = 0;
+
+  locationMapTileLayer = L.tileLayer(provider.url, {
+    maxZoom: 20,
+    attribution: provider.attribution
+  }).addTo(locationMap);
+
+  locationMapTileLayer.on("tileerror", () => {
+    locationMapTileErrorCount += 1;
+    if(locationMapTileErrorTimer) clearTimeout(locationMapTileErrorTimer);
+    locationMapTileErrorTimer = setTimeout(() => {
+      if(locationMapTileErrorCount >= 8){
+        const next = (locationMapTileProviderIndex + 1) % MAP_TILE_PROVIDERS.length;
+        setMapTileProvider(next);
+      }
+    }, 1500);
+  });
 }
 
 function centerMapToActiveLocation(){
@@ -3507,8 +3548,19 @@ async function exportToPDF(){
     alert("Kunne ikke åpne vindu. Sjekk popup-blokkering.");
     return;
   }
-  const html = await buildReportContent();
-  await printReport(html, w);
+  try {
+    const html = await buildReportContent();
+    await printReport(html, w);
+  } catch (err){
+    console.error(err);
+    w.document.open();
+    w.document.write(`<!doctype html><html><body style="font-family:Arial,sans-serif;padding:20px;">
+      <h1>Feil ved PDF</h1>
+      <p>Rapporten kunne ikke genereres. Prøv igjen.</p>
+    </body></html>`);
+    w.document.close();
+    alert("Kunne ikke generere PDF. Se konsollen for detaljer.");
+  }
 }
 
 async function exportToWord(){
