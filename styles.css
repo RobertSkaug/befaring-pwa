@@ -344,6 +344,12 @@ input, select, textarea{
   color: #333;
 }
 
+.map-lock-status {
+  margin-top: 8px;
+  font-size: 12px;
+  color: #555;
+}
+
 .report__building-meta {
   font-family: Arial, sans-serif;
   font-size: 10pt;

@@ -109,9 +109,21 @@ let state = {
 const $ = (id) => document.getElementById(id);
 const digits = (s) => (s||"").replace(/\D+/g,"");
 const esc = (s) => String(s??"").replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const staticMapUrl = (lat, lng, zoom = 18, w = 700, h = 360) => {
-  const center = `${lat},${lng}`;
-  return `https://staticmap.openstreetmap.de/staticmap.php?center=${center}&zoom=${zoom}&size=${w}x${h}&markers=${center},red-pushpin`;
+const staticMapUrl = ({ center, zoom = 18, width = 700, height = 360, markers = [] }) => {
+  if(!center) return "";
+  const params = new URLSearchParams();
+  params.set("center", `${center.lat},${center.lng}`);
+  params.set("zoom", String(zoom));
+  params.set("size", `${width}x${height}`);
+  if(markers.length === 0){
+    params.append("markers", `${center.lat},${center.lng},red-pushpin`);
+  } else {
+    markers.forEach(m => {
+      const color = m.color || "red-pushpin";
+      params.append("markers", `${m.lat},${m.lng},${color}`);
+    });
+  }
+  return `https://staticmap.openstreetmap.de/staticmap.php?${params.toString()}`;
 };
 
 const LEGACY_MATERIALS = [
@@ -270,6 +282,7 @@ function newLocation(id){
     address:"",
     objectName:"",
     geo:{ lat:null, lng:null, accuracy:null, ts:null },
+    mapView: null,
 
     buildings: [ newBuilding(`B-${id}-1`) ],
     activeBuildingId: `B-${id}-1`
@@ -346,6 +359,10 @@ function init(){
   if(centerMapBtn) centerMapBtn.addEventListener("click", () => centerMapToActiveLocation());
   const clearPinBtn = $("btnClearBuildingPin");
   if(clearPinBtn) clearPinBtn.addEventListener("click", () => clearActiveBuildingPin());
+  const lockMapBtn = $("btnLockMapView");
+  if(lockMapBtn) lockMapBtn.addEventListener("click", () => lockLocationMapView());
+  const clearMapBtn = $("btnClearMapView");
+  if(clearMapBtn) clearMapBtn.addEventListener("click", () => clearLocationMapView());
 
   // Buildings
   $("btnAddBuilding").addEventListener("click", addBuilding);
@@ -980,6 +997,7 @@ function renderActiveLocationFields(){
   initLocationMap();
   renderBuildingMapMarkers();
   updateBuildingPinStatus();
+  updateMapLockStatus();
 
   renderAddressSuggestions([]);
   renderBusinessSuggestions([]);
@@ -1484,7 +1502,9 @@ function renderBuildingMapMarkers(){
 
   const activeLoc = getActiveLocation();
   const activeB = getActiveBuilding();
-  if(activeB?.geo?.lat && activeB?.geo?.lng){
+  if(activeLoc?.mapView?.center){
+    locationMap.setView([activeLoc.mapView.center.lat, activeLoc.mapView.center.lng], activeLoc.mapView.zoom || 18);
+  } else if(activeB?.geo?.lat && activeB?.geo?.lng){
     locationMap.setView([activeB.geo.lat, activeB.geo.lng], 18);
   } else if(markers.length > 0){
     const group = L.featureGroup(markers);
@@ -1580,6 +1600,53 @@ function updateBuildingPinStatus(){
       </div>
     `;
   }).join("");
+}
+
+function lockLocationMapView(){
+  const loc = getActiveLocation();
+  if(!loc || !locationMap) return;
+  const center = locationMap.getCenter();
+  loc.mapView = { center: { lat: center.lat, lng: center.lng }, zoom: locationMap.getZoom() };
+  saveBuild();
+  updateMapLockStatus();
+}
+
+function clearLocationMapView(){
+  const loc = getActiveLocation();
+  if(!loc) return;
+  loc.mapView = null;
+  saveBuild();
+  updateMapLockStatus();
+}
+
+function updateMapLockStatus(){
+  const el = $("mapLockStatus");
+  if(!el) return;
+  const loc = getActiveLocation();
+  if(!loc){
+    el.textContent = "";
+    return;
+  }
+  if(loc.mapView?.center){
+    el.textContent = `Kartutsnitt låst til rapport (zoom ${loc.mapView.zoom})`;
+  } else {
+    el.textContent = "Kartutsnitt ikke låst (auto)";
+  }
+}
+
+function getLocationMapData(loc, focusBld){
+  if(!loc) return null;
+  const markers = (loc.buildings || []).filter(b => b.geo?.lat && b.geo?.lng)
+    .map(b => ({ lat: b.geo.lat, lng: b.geo.lng, color: "red-pushpin" }));
+
+  const center = loc.mapView?.center
+    || (focusBld?.geo?.lat && focusBld?.geo?.lng ? { lat: focusBld.geo.lat, lng: focusBld.geo.lng } : null)
+    || (markers[0] ? { lat: markers[0].lat, lng: markers[0].lng } : null)
+    || (loc.geo?.lat && loc.geo?.lng ? { lat: loc.geo.lat, lng: loc.geo.lng } : null);
+
+  if(!center) return null;
+  const zoom = loc.mapView?.zoom || 18;
+  return { center, zoom, markers };
 }
 
 /* =========================
@@ -2106,14 +2173,14 @@ async function buildReportHtml(){
       const label = esc(bld.label || "Bygg");
       const addr = esc(loc.address || "—");
       const buildingNo = esc(bld.buildingNo || "—");
-      const hasGeo = bld.geo?.lat && bld.geo?.lng;
-      const mapUrl = hasGeo ? staticMapUrl(bld.geo.lat, bld.geo.lng) : "";
-      const mapHtml = hasGeo ? `
-    <div class="report__map">
-      <img src="${mapUrl}" alt="Kart for ${label}">
-      <div class="report__map-caption">📍 ${label} – ${bld.geo.lat.toFixed(5)}, ${bld.geo.lng.toFixed(5)}</div>
-    </div>
-    ` : "";
+      const mapData = getLocationMapData(loc, bld);
+      const mapUrl = mapData ? staticMapUrl(mapData) : "";
+      const mapHtml = mapUrl ? `
+<div class="report__map">
+  <img src="${mapUrl}" alt="Kart for ${label}" referrerpolicy="no-referrer">
+  <div class="report__map-caption">📍 ${label}</div>
+</div>
+` : "";
       
       // Virksomhet (flere valgt) - vis som punktliste
       let businessHtml = "";
@@ -2991,12 +3058,12 @@ async function buildReportContent() {
       const label = esc(bld.label || "Bygg");
       const addr = esc(loc.address || "—");
       const buildingNo = esc(bld.buildingNo || "—");
-      const hasGeo = bld.geo?.lat && bld.geo?.lng;
-      const mapUrl = hasGeo ? staticMapUrl(bld.geo.lat, bld.geo.lng) : "";
-      const mapHtml = hasGeo ? `
+      const mapData = getLocationMapData(loc, bld);
+      const mapUrl = mapData ? staticMapUrl(mapData) : "";
+      const mapHtml = mapUrl ? `
 <div class="report__map">
-  <img src="${mapUrl}" alt="Kart for ${label}">
-  <div class="report__map-caption">📍 ${label} – ${bld.geo.lat.toFixed(5)}, ${bld.geo.lng.toFixed(5)}</div>
+  <img src="${mapUrl}" alt="Kart for ${label}" referrerpolicy="no-referrer">
+  <div class="report__map-caption">📍 ${label}</div>
 </div>
 ` : "";
       

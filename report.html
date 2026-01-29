@@ -98,9 +98,21 @@
 
 <script>
 function esc(s){ return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c])); }
-function staticMapUrl(lat, lng, zoom = 18, w = 700, h = 360){
-  const center = `${lat},${lng}`;
-  return `https://staticmap.openstreetmap.de/staticmap.php?center=${center}&zoom=${zoom}&size=${w}x${h}&markers=${center},red-pushpin`;
+function staticMapUrl({ center, zoom = 18, width = 700, height = 360, markers = [] }){
+  if(!center) return "";
+  const params = new URLSearchParams();
+  params.set("center", `${center.lat},${center.lng}`);
+  params.set("zoom", String(zoom));
+  params.set("size", `${width}x${height}`);
+  if(markers.length === 0){
+    params.append("markers", `${center.lat},${center.lng},red-pushpin`);
+  } else {
+    markers.forEach(m => {
+      const color = m.color || "red-pushpin";
+      params.append("markers", `${m.lat},${m.lng},${color}`);
+    });
+  }
+  return `https://staticmap.openstreetmap.de/staticmap.php?${params.toString()}`;
 }
 
 let reportData = null;
@@ -151,12 +163,18 @@ function renderReport(){
     const avvik = items.filter(it => it.type === 'AVVIK');
     const anb = items.filter(it => it.type === 'ANBEFALING');
 
+    const markers = (loc.buildings || []).filter(b => b.geo?.lat && b.geo?.lng)
+      .map(b => ({ lat: b.geo.lat, lng: b.geo.lng, color: "red-pushpin" }));
+    const center = loc.mapView?.center
+      || (markers[0] ? { lat: markers[0].lat, lng: markers[0].lng } : null)
+      || (loc.geo?.lat && loc.geo?.lng ? { lat: loc.geo.lat, lng: loc.geo.lng } : null);
+    const zoom = loc.mapView?.zoom || 18;
+    const mapUrl = center ? staticMapUrl({ center, zoom, markers }) : '';
+
     const buildingsHtml = (loc.buildings || []).map((b, bIdx) => {
       const label = esc(b.label || `Bygg ${bIdx + 1}`);
       const buildingNo = b.buildingNo ? ` (bygningsnr. ${esc(b.buildingNo)})` : '';
-      const hasGeo = b.geo?.lat && b.geo?.lng;
-      const mapUrl = hasGeo ? staticMapUrl(b.geo.lat, b.geo.lng) : '';
-      const coords = hasGeo ? `${b.geo.lat.toFixed(5)}, ${b.geo.lng.toFixed(5)}` : 'Ikke plassert';
+      const coords = (b.geo?.lat && b.geo?.lng) ? `${b.geo.lat.toFixed(5)}, ${b.geo.lng.toFixed(5)}` : 'Ikke plassert';
 
       return `
         <div class="building-card">
@@ -164,8 +182,8 @@ function renderReport(){
           <div class="muted">📍 ${coords}</div>
           ${mapUrl ? `
             <div class="report__map">
-              <img src="${mapUrl}" alt="Kart for ${label}">
-              <div class="report__map-caption">${label} – ${coords}</div>
+              <img src="${mapUrl}" alt="Kart for ${label}" referrerpolicy="no-referrer">
+              <div class="report__map-caption">${label}</div>
             </div>
           ` : ''}
         </div>
