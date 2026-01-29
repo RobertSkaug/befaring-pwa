@@ -109,20 +109,16 @@ let state = {
 const $ = (id) => document.getElementById(id);
 const digits = (s) => (s||"").replace(/\D+/g,"");
 const esc = (s) => String(s??"").replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const staticMapUrl = ({ center, zoom = 18, width = 700, height = 360, markers = [] }) => {
+const staticMapUrl = ({ center, zoom = 18, width = 640, height = 360, markers = [] }) => {
   if(!center) return "";
   const params = new URLSearchParams();
   params.set("center", `${center.lat},${center.lng}`);
   params.set("zoom", String(zoom));
   params.set("size", `${width}x${height}`);
-  if(markers.length === 0){
-    params.append("markers", `${center.lat},${center.lng},red-pushpin`);
-  } else {
-    markers.forEach(m => {
-      const color = m.color || "red-pushpin";
-      params.append("markers", `${m.lat},${m.lng},${color}`);
-    });
-  }
+  const markerList = (markers.length === 0)
+    ? [`${center.lat},${center.lng},red-pushpin`]
+    : markers.map(m => `${m.lat},${m.lng},${m.color || "red-pushpin"}`);
+  params.set("markers", markerList.join("|"));
   return `https://staticmap.openstreetmap.de/staticmap.php?${params.toString()}`;
 };
 
