@@ -1403,6 +1403,8 @@ function renderChipGroup(containerId, options, selectedArr, onToggle){
 ========================= */
 let locationMap = null;
 let locationMapMarkers = {};
+let locationMapLabelLayer = null;
+let locationMapLineLayer = null;
 
 function initLocationMap(){
   const mapEl = $("locationMap");
@@ -1414,6 +1416,9 @@ function initLocationMap(){
     maxZoom: 20,
     attribution: "© OpenStreetMap"
   }).addTo(locationMap);
+
+  locationMapLabelLayer = L.layerGroup().addTo(locationMap);
+  locationMapLineLayer = L.layerGroup().addTo(locationMap);
 
   locationMap.setView([59.9139, 10.7522], 12);
 
@@ -1427,6 +1432,9 @@ function initLocationMap(){
     renderBuildingMapMarkers();
     updateBuildingPinStatus();
   });
+
+  locationMap.on("zoomend", () => renderMapLabels());
+  locationMap.on("moveend", () => renderMapLabels());
 
   setTimeout(() => locationMap.invalidateSize(), 60);
 }
@@ -1466,9 +1474,8 @@ function renderBuildingMapMarkers(){
     (loc.buildings || []).forEach((b, bIdx) => {
       if(b.geo?.lat && b.geo?.lng){
         const marker = L.marker([b.geo.lat, b.geo.lng]).addTo(locationMap);
-        const locLabel = shortLabel(loc, locIdx);
-        const bLabel = buildingShortLabel(b, bIdx);
-        marker.bindTooltip(`${locLabel} – ${bLabel}`, { permanent: true, direction: "top", offset: [0, -12] });
+        const bLabel = (b.label || "").trim() || `Bygg ${bIdx + 1}`;
+        marker._labelText = bLabel;
         locationMapMarkers[`${loc.id}:${b.id}`] = marker;
         markers.push(marker);
       }
@@ -1485,6 +1492,73 @@ function renderBuildingMapMarkers(){
   } else if(activeLoc?.geo?.lat && activeLoc?.geo?.lng){
     locationMap.setView([activeLoc.geo.lat, activeLoc.geo.lng], 17);
   }
+
+  renderMapLabels();
+}
+
+function renderMapLabels(){
+  if(!locationMap || !locationMapLabelLayer || !locationMapLineLayer) return;
+  locationMapLabelLayer.clearLayers();
+  locationMapLineLayer.clearLayers();
+
+  const placed = [];
+  const candidates = [
+    { x: 16, y: -34 },
+    { x: -16, y: -34 },
+    { x: 16, y: 10 },
+    { x: -16, y: 10 }
+  ];
+
+  const estimateBox = (text) => {
+    const width = Math.min(220, Math.max(70, text.length * 7 + 18));
+    const height = 22;
+    return { width, height };
+  };
+
+  Object.values(locationMapMarkers).forEach(marker => {
+    const text = (marker._labelText || "").trim();
+    if(!text) return;
+
+    const { width, height } = estimateBox(text);
+    const base = locationMap.latLngToContainerPoint(marker.getLatLng());
+    let placedRect = null;
+    let labelPoint = null;
+
+    for (const c of candidates){
+      const x = base.x + c.x + (c.x < 0 ? -width : 0);
+      const y = base.y + c.y + (c.y < 0 ? -height : 0);
+      const rect = { left: x, top: y, right: x + width, bottom: y + height };
+
+      const overlaps = placed.some(p => !(rect.right < p.left || rect.left > p.right || rect.bottom < p.top || rect.top > p.bottom));
+      if(!overlaps){
+        placedRect = rect;
+        labelPoint = L.point(x, y);
+        break;
+      }
+    }
+
+    if(!placedRect || !labelPoint) return;
+    placed.push(placedRect);
+
+    const labelLatLng = locationMap.containerPointToLatLng(labelPoint);
+    const labelIcon = L.divIcon({
+      className: "map-label",
+      html: `<div class=\"map-label__text\">${esc(text)}</div>`,
+      iconSize: [width, height],
+      iconAnchor: [0, 0]
+    });
+
+    const labelMarker = L.marker(labelLatLng, { icon: labelIcon, interactive: false }).addTo(locationMapLabelLayer);
+
+    const lineTargetPoint = L.point(labelPoint.x + width / 2, labelPoint.y + height / 2);
+    const lineLatLng = locationMap.containerPointToLatLng(lineTargetPoint);
+    L.polyline([marker.getLatLng(), lineLatLng], {
+      color: "#555",
+      weight: 1,
+      opacity: 0.8,
+      dashArray: "3,3"
+    }).addTo(locationMapLineLayer);
+  });
 }
 
 function updateBuildingPinStatus(){
