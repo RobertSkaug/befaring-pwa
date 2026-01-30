@@ -3240,8 +3240,13 @@ async function exportToWord(){
 }
 
 async function exportAndEmail(){
-  const html = await buildReportHtml();
-  
+  let html = "";
+  try {
+    html = await buildReportHtml();
+  } catch (err){
+    console.error(err);
+  }
+
   const blob = new Blob([html], {
     type: "application/msword"
   });
@@ -3273,8 +3278,6 @@ async function exportAndEmail(){
         console.error(err);
       }
     }
-  } else {
-    // fall through to mailto
   }
 
   // Fallback: last ned fil og åpne mailto
