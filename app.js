@@ -262,7 +262,6 @@ function newLocation(id){
   return {
     id,
     address:"",
-    objectName:"",
     geo:{ lat:null, lng:null, accuracy:null, ts:null },
 
     buildings: [ newBuilding(`B-${id}-1`) ],
@@ -284,6 +283,7 @@ function init(){
   $("btnGoFindings").addEventListener("click", () => showStep("findings"));
 
   $("btnStartInspection").addEventListener("click", () => {
+    clearLocationHistory();
     showStep("locations");
   });
 
@@ -331,7 +331,6 @@ function init(){
 
   // Locations
   $("btnAddLocation").addEventListener("click", addLocation);
-  $("objectName").addEventListener("input", e => { getActiveLocation().objectName = e.target.value; renderLocationTabs(); });
   $("address").addEventListener("input", e => { getActiveLocation().address = e.target.value; renderLocationTabs(); });
 
   $("btnGPS").addEventListener("click", getGPS);
@@ -851,9 +850,7 @@ function locationIndexById(id){
   return Math.max(0, state.locations.findIndex(l => l.id === id));
 }
 function shortLabel(loc, idx){
-  const name = (loc.objectName||"").trim();
   const addr = (loc.address||"").trim();
-  if(name) return name.length > 28 ? name.slice(0,25)+"…" : name;
   if(addr) return addr.length > 28 ? addr.slice(0,25)+"…" : addr;
   return `Lokasjon ${idx+1}`;
 }
@@ -950,7 +947,6 @@ function renderLocationTabs(){
 
 function renderActiveLocationFields(){
   const loc = getActiveLocation();
-  $("objectName").value = loc.objectName || "";
   $("address").value = loc.address || "";
 
   if(loc.geo.lat && loc.geo.lng){
@@ -1815,7 +1811,7 @@ function renderFindingsList(){
   const locName = (id) => {
     const idx = locationIndexById(id);
     const l = state.locations.find(x=>x.id===id);
-    return (l?.objectName||"").trim() || (l?.address||"").trim() || `Lokasjon ${idx+1}`;
+    return (l?.address||"").trim() || `Lokasjon ${idx+1}`;
   };
 
   root.innerHTML = Array.from(byLoc.entries()).map(([locId, arr]) => {
@@ -3353,3 +3349,14 @@ async function suggestFromImage(){
 }
 
 init();
+
+function clearLocationHistory(){
+  state.locations.forEach(loc => {
+    loc.address = "";
+    loc.geo = { lat:null, lng:null, accuracy:null, ts:null };
+    (loc.buildings || []).forEach(b => {
+      b.description = "";
+    });
+  });
+  saveBuild();
+}
