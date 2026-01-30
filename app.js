@@ -1112,10 +1112,16 @@ function renderConstructionMaterials(){
     return options.map(opt => {
       const code = opt.code;
       const isActive = selected.includes(code);
+      const infoBtn = opt.desc
+        ? `<button type="button" class="info-btn" data-mat-info-title="${esc(opt.label)}" data-mat-info="${esc(opt.desc)}">?</button>`
+        : "";
       return `
-        <button type="button" class="construction-chip ${isActive ? "construction-chip--material" : ""}" data-mat-part="${partKey}" data-mat-code="${code}">
-          ${esc(opt.label)}
-        </button>
+        <div class="mat-option">
+          <button type="button" class="construction-chip ${isActive ? "construction-chip--material" : ""}" data-mat-part="${partKey}" data-mat-code="${code}">
+            ${esc(opt.label)}
+          </button>
+          ${infoBtn}
+        </div>
       `;
     }).join("");
   };
@@ -1175,6 +1181,15 @@ function renderConstructionMaterials(){
       if(!state.selected.includes("annet")) state.otherText = "";
       renderConstructionMaterials();
       saveBuild();
+    });
+  });
+
+  container.querySelectorAll("[data-mat-info]").forEach(btn => {
+    btn.addEventListener("click", (e) => {
+      e.stopPropagation();
+      const title = btn.getAttribute("data-mat-info-title") || "Info";
+      const desc = btn.getAttribute("data-mat-info") || "";
+      openHelpModal(title, desc);
     });
   });
 
