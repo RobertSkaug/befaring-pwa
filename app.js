@@ -300,7 +300,6 @@ function init(){
   // Eksport-knapper
   $("btnExportPDF").addEventListener("click", exportToPDF);
   $("btnExportEmail").addEventListener("click", exportAndEmail);
-  $("btnExportWord").addEventListener("click", exportToWord);
 
   // BRREG: orgnr input auto fetch
   $("orgnr").addEventListener("input", async (e) => {
@@ -3273,8 +3272,11 @@ async function exportAndEmail(){
       }
     }
   } else {
-    // Ingen Web Share API
-    alert("Deling via e-post støttes ikke på denne enheten.\n\nBruk en mobil enhet eller nettbrett, eller last ned rapporten og send manuelt.");
+    // Ingen Web Share API -> fallback til mailto
+    const subject = `Befaringsrapport – ${state.customer.name || "kunde"}`;
+    const body = `Vedlagt befaringsrapport for ${state.customer.name || "kunde"} datert ${formatDateNo(state.inspectionDate)}.\n\nOBS: Nettleseren støtter ikke automatisk vedlegg. Last ned rapporten og legg ved manuelt.\n\nKLP Skadeforsikring AS`;
+    const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailto;
   }
 }
 
