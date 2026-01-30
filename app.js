@@ -2133,25 +2133,6 @@ ${matProtHtml}
   margin: 2.5cm 2.5cm 2cm 2.5cm;
 }
 
-async function buildReportWordHtml(){
-  const reportBody = await buildReportContent();
-  const reportCss = await fetch("./report.css", { cache: "no-store" })
-    .then(r => r.text())
-    .catch(() => "");
-
-  return `<!doctype html>
-<html lang="nb">
-<head>
-  <meta charset="utf-8">
-  <title>Befaringsrapport</title>
-  <style>${reportCss}</style>
-</head>
-<body>
-${reportBody}
-</body>
-</html>`;
-}
-
 body {
   margin: 0;
   padding: 0;
@@ -3259,13 +3240,8 @@ async function exportToWord(){
 }
 
 async function exportAndEmail(){
-  let html = "";
-  try {
-    html = await buildReportWordHtml();
-  } catch (err){
-    console.error(err);
-  }
-
+  const html = await buildReportHtml();
+  
   const blob = new Blob([html], {
     type: "application/msword"
   });
@@ -3283,28 +3259,25 @@ async function exportAndEmail(){
           text: `Vedlagt befaringsrapport for ${state.customer.name || "kunde"} datert ${formatDateNo(state.inspectionDate)}.\n\nKLP Skadeforsikring AS`,
           files: [file]
         });
-        return;
       } else {
         // Ingen fil-deling, prøv bare tekst+URL
         await navigator.share({
           title: "Befaringsrapport – Risikogjennomgang",
           text: `Befaringsrapport for ${state.customer.name || "kunde"} datert ${formatDateNo(state.inspectionDate)}.\n\nOBS: Denne enheten støtter ikke automatisk vedlegg. Last ned rapporten separat med knappen "Last ned Word".`
         });
-        return;
       }
     } catch (err){
       if (err.name !== "AbortError"){
-        console.error(err);
+        alert("Kunne ikke dele rapport. Prøv å laste ned og dele manuelt.");
       }
     }
+  } else {
+    // Ingen Web Share API -> fallback til mailto
+    const subject = `Befaringsrapport – ${state.customer.name || "kunde"}`;
+    const body = `Vedlagt befaringsrapport for ${state.customer.name || "kunde"} datert ${formatDateNo(state.inspectionDate)}.\n\nOBS: Nettleseren støtter ikke automatisk vedlegg. Last ned rapporten og legg ved manuelt.\n\nKLP Skadeforsikring AS`;
+    const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
+    window.location.href = mailto;
   }
-
-  // Fallback: last ned fil og åpne mailto
-  downloadFile(blob, filename);
-  const subject = `Befaringsrapport – ${state.customer.name || "kunde"}`;
-  const body = `Vedlagt befaringsrapport for ${state.customer.name || "kunde"} datert ${formatDateNo(state.inspectionDate)}.\n\nHusk å legge ved nedlastet rapport i e-posten.\n\nKLP Skadeforsikring AS`;
-  const mailto = `mailto:?subject=${encodeURIComponent(subject)}&body=${encodeURIComponent(body)}`;
-  window.location.href = mailto;
 }
 
 function downloadFile(blob, filename){
