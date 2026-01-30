@@ -35,12 +35,6 @@
     .badge-status { display:inline-block; padding:4px 8px; border-radius:6px; font-size:12px; font-weight:600; }
     .badge-avvik { background:#fce4ec; color:#c2185b; }
     .badge-anb { background:#e0f2f1; color:#00897b; }
-    .building-grid { display:grid; gap:12px; margin:10px 0 16px; }
-    .building-card { background:#fafafa; border:1px solid #eee; border-radius:8px; padding:12px; }
-    .building-title { font-weight:700; margin-bottom:6px; }
-    .report__map { margin:8px 0 0; border:1px solid #ddd; border-radius:6px; overflow:hidden; background:#f7f7f7; }
-    .report__map img { width:100%; height:auto; display:block; }
-    .report__map-caption { font-size:12px; padding:6px 8px; background:#f0f0f0; color:#333; }
   </style>
 </head>
 <body>
@@ -98,18 +92,6 @@
 
 <script>
 function esc(s){ return String(s||"").replace(/[&<>"']/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;","\"":"&quot;","'":"&#039;"}[c])); }
-function staticMapUrl({ center, zoom = 18, width = 640, height = 360, markers = [] }){
-  if(!center) return "";
-  const params = new URLSearchParams();
-  params.set("center", `${center.lat},${center.lng}`);
-  params.set("zoom", String(zoom));
-  params.set("size", `${width}x${height}`);
-  const markerList = (markers.length === 0)
-    ? [`${center.lat},${center.lng},red-pushpin`]
-    : markers.map(m => `${m.lat},${m.lng},${m.color || "red-pushpin"}`);
-  params.set("markers", markerList.join("|"));
-  return `https://staticmap.openstreetmap.de/staticmap.php?${params.toString()}`;
-}
 
 let reportData = null;
 
@@ -159,32 +141,6 @@ function renderReport(){
     const avvik = items.filter(it => it.type === 'AVVIK');
     const anb = items.filter(it => it.type === 'ANBEFALING');
 
-    const markers = (loc.buildings || []).filter(b => b.geo?.lat && b.geo?.lng)
-      .map(b => ({ lat: b.geo.lat, lng: b.geo.lng, color: "red-pushpin" }));
-    const center = (markers[0] ? { lat: markers[0].lat, lng: markers[0].lng } : null)
-      || (loc.geo?.lat && loc.geo?.lng ? { lat: loc.geo.lat, lng: loc.geo.lng } : null);
-    const zoom = 18;
-    const mapUrl = loc.mapSnapshot || (center ? staticMapUrl({ center, zoom, markers }) : '');
-
-    const buildingsHtml = (loc.buildings || []).map((b, bIdx) => {
-      const label = esc(b.label || `Bygg ${bIdx + 1}`);
-      const buildingNo = b.buildingNo ? ` (bygningsnr. ${esc(b.buildingNo)})` : '';
-      const coords = (b.geo?.lat && b.geo?.lng) ? `${b.geo.lat.toFixed(5)}, ${b.geo.lng.toFixed(5)}` : 'Ikke plassert';
-
-      return `
-        <div class="building-card">
-          <div class="building-title">${label}${buildingNo}</div>
-          <div class="muted">📍 ${coords}</div>
-          ${mapUrl ? `
-            <div class="report__map">
-              <img src="${mapUrl}" alt="Kart for ${label}" referrerpolicy="no-referrer">
-              <div class="report__map-caption">${label}</div>
-            </div>
-          ` : ''}
-        </div>
-      `;
-    }).join('');
-
     const renderItem = (item) => `
       <div class="item-card">
         <div class="item-header">
@@ -227,11 +183,6 @@ function renderReport(){
               : '—'}</div>
           </div>
         </div>
-
-        ${buildingsHtml ? `
-          <div class="section-header">🏢 Bygg og kart</div>
-          <div class="building-grid">${buildingsHtml}</div>
-        ` : ''}
 
         <h3 style="margin:16px 0 10px; font-size:15px; font-weight:700;">Avvik (${avvik.length})</h3>
         ${avvik.length ? avvik.map(renderItem).join('') : '<p class="muted">Ingen avvik.</p>'}

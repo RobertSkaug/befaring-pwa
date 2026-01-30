@@ -109,58 +109,26 @@ let state = {
 const $ = (id) => document.getElementById(id);
 const digits = (s) => (s||"").replace(/\D+/g,"");
 const esc = (s) => String(s??"").replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
-const staticMapUrl = ({ center, zoom = 18, width = 640, height = 360, markers = [] }) => {
-  if(!center) return "";
-  const params = new URLSearchParams();
-  params.set("center", `${center.lat},${center.lng}`);
-  params.set("zoom", String(zoom));
-  params.set("size", `${width}x${height}`);
-  const markerList = (markers.length === 0)
-    ? [`${center.lat},${center.lng},red-pushpin`]
-    : markers.map(m => `${m.lat},${m.lng},${m.color || "red-pushpin"}`);
-  params.set("markers", markerList.join("|"));
-  return `https://staticmap.openstreetmap.de/staticmap.php?${params.toString()}`;
-};
 
-let html2canvasLoading = null;
-function loadHtml2Canvas(){
-  if(window.html2canvas) return Promise.resolve(true);
-  if(html2canvasLoading) return html2canvasLoading;
-  html2canvasLoading = new Promise((resolve) => {
-    const script = document.createElement("script");
-    script.src = "https://cdn.jsdelivr.net/npm/html2canvas@1.4.1/dist/html2canvas.min.js";
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.head.appendChild(script);
-  });
-  return html2canvasLoading;
+const LEGACY_MATERIALS = [
+  { code:"B", label:"Betong" },
+  { code:"S", label:"Stål" },
+  { code:"T", label:"Tre" },
+  { code:"M", label:"Mur" },
+  { code:"U", label:"Ubrennbar isolasjon" },
+  { code:"C", label:"Brennbar isolasjon" }
+];
+function getMaterialConfig(){
+  return window.MaterialConfig || { buildingParts: [], materialLabels: {} };
 }
-
-let leafletLoading = null;
-function loadLeaflet(){
-  if(window.L) return Promise.resolve(true);
-  if(leafletLoading) return leafletLoading;
-  leafletLoading = new Promise((resolve) => {
-    const cssId = "leaflet-css";
-    if(!document.getElementById(cssId)){
-      const link = document.createElement("link");
-      link.id = cssId;
-      link.rel = "stylesheet";
-      link.href = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.css";
-      link.integrity = "sha256-p4NxAoJBhIIN+hmNHrzRCf9tD/miZyoHS5obTRR9BMY=";
-      link.crossOrigin = "";
-      document.head.appendChild(link);
-    }
-    const script = document.createElement("script");
-    script.src = "https://unpkg.com/leaflet@1.9.4/dist/leaflet.js";
-    script.integrity = "sha256-20nQCchB9co0qIjJZRGuk2/Z9VM+kNiyxNV1lvTlZBo=";
-    script.crossOrigin = "";
-    script.onload = () => resolve(true);
-    script.onerror = () => resolve(false);
-    document.head.appendChild(script);
-  });
-  return leafletLoading;
-}
+const PROTECTION = [
+  { code:"S", label:"Sprinkleranlegg" },
+  { code:"A", label:"Brannalarmanlegg" },
+  { code:"I", label:"Innbruddsalarmanlegg" },
+  { code:"G", label:"Gasslokkeanlegg" },
+  { code:"R", label:"Røykventilasjon" },
+  { code:"D", label:"Delvis beskyttelse" }
+];
 
 const CONSTR_COL = [
   { code:"BETONG", label:"Betong" },
@@ -251,8 +219,6 @@ function newBuilding(id){
     buildingNo: "",   // Bygningsnummer
     businessInBuilding: [],
 
-    geo: { lat: null, lng: null },
-
     buildYear:"",
     areaM2:"",
     areaBreakdown:{},
@@ -298,7 +264,6 @@ function newLocation(id){
     address:"",
     objectName:"",
     geo:{ lat:null, lng:null, accuracy:null, ts:null },
-    mapSnapshot: null,
 
     buildings: [ newBuilding(`B-${id}-1`) ],
     activeBuildingId: `B-${id}-1`
@@ -371,10 +336,6 @@ function init(){
   $("address").addEventListener("input", e => { getActiveLocation().address = e.target.value; renderLocationTabs(); });
 
   $("btnGPS").addEventListener("click", getGPS);
-  const captureMapBtn = $("btnCaptureMap");
-  if(captureMapBtn) captureMapBtn.addEventListener("click", () => captureLocationMapSnapshot());
-  const reloadMapBtn = $("btnReloadMap");
-  if(reloadMapBtn) reloadMapBtn.addEventListener("click", () => refreshLocationMap());
 
   // Buildings
   $("btnAddBuilding").addEventListener("click", addBuilding);
@@ -384,8 +345,6 @@ function init(){
     b.label = e.target.value;
     renderBuildingTabs();
     renderFindingLocationSelect();
-    renderBuildingMapMarkers();
-    updateBuildingPinStatus();
   });
 
   $("buildingNo").addEventListener("input", e => {
@@ -973,8 +932,6 @@ function renderActiveBuildingFields(){
   renderProtectionMeasures();
   renderBusinessSelected();
   renderAreaBreakdown();
-  renderBuildingMapMarkers();
-  updateBuildingPinStatus();
 }
 
 function renderLocationTabs(){
@@ -1005,11 +962,6 @@ function renderActiveLocationFields(){
 
   renderBuildingTabs();
   renderActiveBuildingFields();
-
-  initLocationMap();
-  renderBuildingMapMarkers();
-  updateBuildingPinStatus();
-  updateMapSnapshotStatus();
 
   renderAddressSuggestions([]);
   renderBusinessSuggestions([]);
@@ -1311,8 +1263,8 @@ function renderProtectionMeasures(){
             <input type="date" id="sprinklerLastCheck" value="${esc(b.sprinklerLastCheck || "")}" />
           </div>
           <div>
-            <label>Poeng (0-100)</label>
-            <input type="number" min="0" max="100" step="1" id="sprinklerScore" value="${esc(b.sprinklerScore || "")}" placeholder="0-100" />
+            <label>Score (1-10)</label>
+            <input type="number" min="1" max="10" step="1" id="sprinklerScore" value="${esc(b.sprinklerScore || "")}" placeholder="1-10" />
           </div>
         </div>
         <p class="muted" style="font-size:13px; margin-top:6px;">Mangler info? Se <a href="https://fgkontroll.no/" target="_blank" rel="noopener">fgkontroll.no</a>.</p>
@@ -1429,309 +1381,6 @@ function renderChipGroup(containerId, options, selectedArr, onToggle){
 }
 
 /* =========================
-   Map: building pinning
-========================= */
-let locationMap = null;
-let locationMapMarkers = {};
-let locationMapLabelLayer = null;
-let locationMapLineLayer = null;
-let locationMapTileLayer = null;
-let locationMapTileProviderIndex = 0;
-let locationMapTileErrorCount = 0;
-let locationMapTileErrorTimer = null;
-
-const MAP_TILE_PROVIDERS = [
-  {
-    url: "https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png",
-    attribution: "© OpenStreetMap"
-  },
-  {
-    url: "https://{s}.tile.openstreetmap.fr/hot/{z}/{x}/{y}.png",
-    attribution: "© OpenStreetMap, HOT"
-  },
-  {
-    url: "https://{s}.basemaps.cartocdn.com/light_all/{z}/{x}/{y}{r}.png",
-    attribution: "© OpenStreetMap © CARTO"
-  }
-];
-
-function initLocationMap(){
-  const mapEl = $("locationMap");
-  if(!mapEl) return;
-  if(!window.L){
-    loadLeaflet().then(() => initLocationMap());
-    return;
-  }
-  if(locationMap) return;
-
-  locationMap = L.map(mapEl, { zoomControl: true });
-  setMapTileProvider(0);
-
-  locationMapLabelLayer = L.layerGroup().addTo(locationMap);
-  locationMapLineLayer = L.layerGroup().addTo(locationMap);
-
-  locationMap.setView([59.9139, 10.7522], 12);
-
-  locationMap.on("click", (e) => {
-    const b = getActiveBuilding();
-    if(!b) return;
-    if(!b.geo) b.geo = { lat: null, lng: null };
-    b.geo.lat = e.latlng.lat;
-    b.geo.lng = e.latlng.lng;
-    saveBuild();
-    renderBuildingMapMarkers();
-    updateBuildingPinStatus();
-  });
-
-  locationMap.on("zoomend", () => renderMapLabels());
-  locationMap.on("moveend", () => renderMapLabels());
-
-  setTimeout(() => locationMap.invalidateSize(), 60);
-}
-
-function setMapTileProvider(index){
-  if(!locationMap) return;
-  const provider = MAP_TILE_PROVIDERS[index];
-  if(!provider) return;
-  if(locationMapTileLayer) locationMap.removeLayer(locationMapTileLayer);
-  locationMapTileProviderIndex = index;
-  locationMapTileErrorCount = 0;
-
-  locationMapTileLayer = L.tileLayer(provider.url, {
-    maxZoom: 20,
-    attribution: provider.attribution
-  }).addTo(locationMap);
-
-  locationMapTileLayer.on("tileerror", () => {
-    locationMapTileErrorCount += 1;
-    if(locationMapTileErrorTimer) clearTimeout(locationMapTileErrorTimer);
-    locationMapTileErrorTimer = setTimeout(() => {
-      if(locationMapTileErrorCount >= 8){
-        const next = (locationMapTileProviderIndex + 1) % MAP_TILE_PROVIDERS.length;
-        setMapTileProvider(next);
-      }
-    }, 1500);
-  });
-}
-
-function refreshLocationMap(){
-  if(!locationMap) return;
-  setMapTileProvider(locationMapTileProviderIndex);
-  setTimeout(() => locationMap.invalidateSize(), 60);
-}
-
-function centerMapToActiveLocation(){
-  if(!locationMap) return;
-  const loc = getActiveLocation();
-  const b = getActiveBuilding();
-
-  if(b?.geo?.lat && b?.geo?.lng){
-    locationMap.setView([b.geo.lat, b.geo.lng], 18);
-    return;
-  }
-  if(loc?.geo?.lat && loc?.geo?.lng){
-    locationMap.setView([loc.geo.lat, loc.geo.lng], 17);
-  }
-}
-
-function clearActiveBuildingPin(){
-  const b = getActiveBuilding();
-  if(!b || !b.geo) return;
-  b.geo.lat = null;
-  b.geo.lng = null;
-  saveBuild();
-  renderBuildingMapMarkers();
-  updateBuildingPinStatus();
-}
-
-function renderBuildingMapMarkers(){
-  if(!locationMap) return;
-
-  Object.values(locationMapMarkers).forEach(m => locationMap.removeLayer(m));
-  locationMapMarkers = {};
-
-  const markers = [];
-  state.locations.forEach((loc, locIdx) => {
-    (loc.buildings || []).forEach((b, bIdx) => {
-      if(b.geo?.lat && b.geo?.lng){
-        const marker = L.marker([b.geo.lat, b.geo.lng]).addTo(locationMap);
-        const bLabel = (b.label || "").trim() || `Bygg ${bIdx + 1}`;
-        marker._labelText = bLabel;
-        locationMapMarkers[`${loc.id}:${b.id}`] = marker;
-        markers.push(marker);
-      }
-    });
-  });
-
-  const activeLoc = getActiveLocation();
-  const activeB = getActiveBuilding();
-  if(activeB?.geo?.lat && activeB?.geo?.lng){
-    locationMap.setView([activeB.geo.lat, activeB.geo.lng], 18);
-  } else if(markers.length > 0){
-    const group = L.featureGroup(markers);
-    locationMap.fitBounds(group.getBounds().pad(0.2));
-  } else if(activeLoc?.geo?.lat && activeLoc?.geo?.lng){
-    locationMap.setView([activeLoc.geo.lat, activeLoc.geo.lng], 17);
-  }
-
-  renderMapLabels();
-}
-
-function renderMapLabels(){
-  if(!locationMap || !locationMapLabelLayer || !locationMapLineLayer) return;
-  locationMapLabelLayer.clearLayers();
-  locationMapLineLayer.clearLayers();
-
-  const placed = [];
-  const candidates = [
-    { x: 16, y: -34 },
-    { x: -16, y: -34 },
-    { x: 16, y: 10 },
-    { x: -16, y: 10 }
-  ];
-
-  const estimateBox = (text) => {
-    const width = Math.min(220, Math.max(70, text.length * 7 + 18));
-    const height = 22;
-    return { width, height };
-  };
-
-  Object.values(locationMapMarkers).forEach(marker => {
-    const text = (marker._labelText || "").trim();
-    if(!text) return;
-
-    const { width, height } = estimateBox(text);
-    const base = locationMap.latLngToContainerPoint(marker.getLatLng());
-    let placedRect = null;
-    let labelPoint = null;
-
-    for (const c of candidates){
-      const x = base.x + c.x + (c.x < 0 ? -width : 0);
-      const y = base.y + c.y + (c.y < 0 ? -height : 0);
-      const rect = { left: x, top: y, right: x + width, bottom: y + height };
-
-      const overlaps = placed.some(p => !(rect.right < p.left || rect.left > p.right || rect.bottom < p.top || rect.top > p.bottom));
-      if(!overlaps){
-        placedRect = rect;
-        labelPoint = L.point(x, y);
-        break;
-      }
-    }
-
-    if(!placedRect || !labelPoint) return;
-    placed.push(placedRect);
-
-    const labelLatLng = locationMap.containerPointToLatLng(labelPoint);
-    const labelIcon = L.divIcon({
-      className: "map-label",
-      html: `<div class=\"map-label__text\">${esc(text)}</div>`,
-      iconSize: [width, height],
-      iconAnchor: [0, 0]
-    });
-
-    const labelMarker = L.marker(labelLatLng, { icon: labelIcon, interactive: false }).addTo(locationMapLabelLayer);
-
-    const lineTargetPoint = L.point(labelPoint.x + width / 2, labelPoint.y + height / 2);
-    const lineLatLng = locationMap.containerPointToLatLng(lineTargetPoint);
-    L.polyline([marker.getLatLng(), lineLatLng], {
-      color: "#555",
-      weight: 1,
-      opacity: 0.8,
-      dashArray: "3,3"
-    }).addTo(locationMapLineLayer);
-  });
-}
-
-function updateBuildingPinStatus(){
-  const root = $("buildingPinStatus");
-  if(!root) return;
-
-  root.innerHTML = state.locations.map((loc, locIdx) => {
-    const locLabel = esc(shortLabel(loc, locIdx));
-    const rows = (loc.buildings || []).map((b, bIdx) => {
-      const label = esc(buildingShortLabel(b, bIdx));
-      const hasPin = b.geo?.lat && b.geo?.lng;
-      const coords = hasPin ? `${b.geo.lat.toFixed(5)}, ${b.geo.lng.toFixed(5)}` : "Ikke plassert";
-      return `<div class="pin-row"><strong>${label}</strong><div>${coords}</div></div>`;
-    }).join("");
-    return `
-      <div>
-        <div class="muted" style="margin:6px 0; font-weight:600;">${locLabel}</div>
-        <div class="map-pin-status__grid">${rows}</div>
-      </div>
-    `;
-  }).join("");
-}
-
-async function captureLocationMapSnapshot(){
-  const loc = getActiveLocation();
-  if(!loc) return;
-  if(!window.html2canvas){
-    const loaded = await loadHtml2Canvas();
-    if(!loaded || !window.html2canvas){
-      alert("Kartbilde kan ikke lagres (html2canvas mangler).");
-      return;
-    }
-  }
-  const mapEl = $("locationMap");
-  if(!mapEl){
-    alert("Kartet er ikke tilgjengelig.");
-    return;
-  }
-
-  try {
-    const canvas = await window.html2canvas(mapEl, {
-      useCORS: true,
-      allowTaint: true,
-      backgroundColor: "#ffffff"
-    });
-    loc.mapSnapshot = canvas.toDataURL("image/png");
-    saveBuild();
-    updateMapSnapshotStatus();
-  } catch (e){
-    console.error(e);
-    alert("Kunne ikke lagre kartbildet. Prøv igjen.");
-  }
-}
-
-function clearLocationMapSnapshot(){
-  const loc = getActiveLocation();
-  if(!loc) return;
-  loc.mapSnapshot = null;
-  saveBuild();
-  updateMapSnapshotStatus();
-}
-
-function updateMapSnapshotStatus(){
-  const el = $("mapSnapshotStatus");
-  if(!el) return;
-  const loc = getActiveLocation();
-  if(!loc){
-    el.textContent = "";
-    return;
-  }
-  if(loc.mapSnapshot){
-    el.textContent = "Kartbilde lagret for rapport.";
-  } else {
-    el.textContent = "Kartbilde ikke lagret (bruker automatisk kart).";
-  }
-}
-
-function getLocationMapData(loc, focusBld){
-  if(!loc) return null;
-  const markers = (loc.buildings || []).filter(b => b.geo?.lat && b.geo?.lng)
-    .map(b => ({ lat: b.geo.lat, lng: b.geo.lng, color: "red-pushpin" }));
-
-  const center = (focusBld?.geo?.lat && focusBld?.geo?.lng ? { lat: focusBld.geo.lat, lng: focusBld.geo.lng } : null)
-    || (markers[0] ? { lat: markers[0].lat, lng: markers[0].lng } : null)
-    || (loc.geo?.lat && loc.geo?.lng ? { lat: loc.geo.lat, lng: loc.geo.lng } : null);
-
-  if(!center) return null;
-  const zoom = 18;
-  return { center, zoom, markers };
-}
-
-/* =========================
    GPS -> Address suggestions
 ========================= */
 function cacheKey(lat,lng){
@@ -1763,8 +1412,6 @@ function getGPS(){
       $("gpsStatus").textContent =
         `GPS: ${loc.geo.lat.toFixed(5)}, ${loc.geo.lng.toFixed(5)} (±${Math.round(loc.geo.accuracy)}m)`;
       renderAddressSuggestions(list);
-      centerMapToActiveLocation();
-      renderBuildingMapMarkers();
     } catch {
       $("gpsStatus").textContent =
         `GPS: ${loc.geo.lat.toFixed(5)}, ${loc.geo.lng.toFixed(5)} (±${Math.round(loc.geo.accuracy)}m)`;
@@ -2255,13 +1902,6 @@ async function buildReportHtml(){
       const label = esc(bld.label || "Bygg");
       const addr = esc(loc.address || "—");
       const buildingNo = esc(bld.buildingNo || "—");
-      const mapUrl = loc.mapSnapshot || (getLocationMapData(loc, bld) ? staticMapUrl(getLocationMapData(loc, bld)) : "");
-      const mapHtml = mapUrl ? `
-<div class="report__map">
-  <img src="${mapUrl}" alt="Kart for ${label}" referrerpolicy="no-referrer">
-  <div class="report__map-caption">📍 ${label}</div>
-</div>
-` : "";
       
       // Virksomhet (flere valgt) - vis som punktliste
       let businessHtml = "";
@@ -2327,10 +1967,11 @@ async function buildReportHtml(){
 <h3>${label}</h3>
 <p><strong>Adresse:</strong> ${addr}</p>
 <p><strong>Bygningsnummer:</strong> ${buildingNo}</p>
-${mapHtml}
 
-    <p><strong>Totalareal:</strong> ${totalArea}</p>
-    ${bizAreaHtml}
+<p><strong>Virksomhet i bygg:</strong></p>
+${businessHtml}
+
+${areaHtml}
 
 <p><strong>Byggeår:</strong> ${buildYear}</p>
 <p><strong>Antall etasjer:</strong> ${floors}</p>
@@ -2660,28 +2301,6 @@ body {
   font-size: 10pt;
   line-height: 1.5;
   margin: 12px 0 24px 0;
-}
-
-.report__map {
-  margin: 10px 0 12px 0;
-  border: 1px solid #ddd;
-  border-radius: 3px;
-  overflow: hidden;
-  background: #f7f7f7;
-}
-
-.report__map img {
-  width: 100%;
-  height: auto;
-  display: block;
-}
-
-.report__map-caption {
-  font-family: Arial, sans-serif;
-  font-size: 9.5pt;
-  padding: 6px 8px;
-  background: #f0f0f0;
-  color: #333;
 }
 
 .report__building-meta p {
@@ -3040,7 +2659,7 @@ function renderConstructionMaterialsReport(bld) {
       if(bld.protectionMeasures.includes("S")){
         const date = bld.sprinklerLastCheck || "—";
         const score = bld.sprinklerScore || "—";
-        html += `<p><em>Sprinkleranlegg:</em> Siste kontroll ${esc(date)} • Poeng (0–100) ${esc(score)}</p>\n`;
+        html += `<p><em>Sprinkleranlegg:</em> Siste kontroll ${esc(date)} • Score ${esc(score)}</p>\n`;
       }
       if(bld.protectionMeasures.includes("A")){
         const conn = bld.fireAlarmConnected || "—";
@@ -3086,7 +2705,7 @@ function renderConstructionMaterialsReport(bld) {
       if (bld.protection.includes("S")) {
         const date = bld.sprinklerLastCheck || "—";
         const score = bld.sprinklerScore || "—";
-        html += `<p><em>Sprinkleranlegg:</em> Siste kontroll ${esc(date)} • Poeng (0–100) ${esc(score)}</p>\n`;
+        html += `<p><em>Sprinkleranlegg:</em> Siste kontroll ${esc(date)} • Score ${esc(score)}</p>\n`;
       }
       if (bld.protection.includes("A")) {
         const conn = bld.fireAlarmConnected || "—";
@@ -3139,13 +2758,6 @@ async function buildReportContent() {
       const label = esc(bld.label || "Bygg");
       const addr = esc(loc.address || "—");
       const buildingNo = esc(bld.buildingNo || "—");
-      const mapUrl = loc.mapSnapshot || (getLocationMapData(loc, bld) ? staticMapUrl(getLocationMapData(loc, bld)) : "");
-      const mapHtml = mapUrl ? `
-<div class="report__map">
-  <img src="${mapUrl}" alt="Kart for ${label}" referrerpolicy="no-referrer">
-  <div class="report__map-caption">📍 ${label}</div>
-</div>
-` : "";
       
       // Virksomhet (flere valgt) - vis som punktliste
       let businessHtml = "";
@@ -3211,7 +2823,6 @@ async function buildReportContent() {
 <h3>${label}</h3>
 <p><strong>Adresse:</strong> ${addr}</p>
 <p><strong>Bygningsnummer:</strong> ${buildingNo}</p>
-${mapHtml}
 <p><strong>Totalareal:</strong> ${totalArea}</p>
 
 ${bizAreaHtml}
@@ -3508,7 +3119,7 @@ async function renderReportPreview() {
   }
 }
 
-async function printReport(reportHtml, targetWindow) {
+async function printReport(reportHtml) {
   // Fetch report.css og report-print.css som tekst (cache bust)
   const reportCss = await fetch("./report.css", { cache: "no-store" })
     .then(r => r.text())
@@ -3563,7 +3174,7 @@ async function printReport(reportHtml, targetWindow) {
   `;
 
   // Åpne nytt vindu og injiser CSS + HTML
-  const w = targetWindow || window.open("", "_blank");
+  const w = window.open("", "_blank");
   if (!w) {
     alert("Kunne ikke åpne vindu. Sjekk popup-blokkering.");
     return;
@@ -3581,24 +3192,8 @@ async function printReport(reportHtml, targetWindow) {
 }
 
 async function exportToPDF(){
-  const w = window.open("", "_blank");
-  if (!w) {
-    alert("Kunne ikke åpne vindu. Sjekk popup-blokkering.");
-    return;
-  }
-  try {
-    const html = await buildReportContent();
-    await printReport(html, w);
-  } catch (err){
-    console.error(err);
-    w.document.open();
-    w.document.write(`<!doctype html><html><body style="font-family:Arial,sans-serif;padding:20px;">
-      <h1>Feil ved PDF</h1>
-      <p>Rapporten kunne ikke genereres. Prøv igjen.</p>
-    </body></html>`);
-    w.document.close();
-    alert("Kunne ikke generere PDF. Se konsollen for detaljer.");
-  }
+  const html = await buildReportContent();
+  await printReport(html);
 }
 
 async function exportToWord(){
