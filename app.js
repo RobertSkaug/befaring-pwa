@@ -2133,6 +2133,25 @@ ${matProtHtml}
   margin: 2.5cm 2.5cm 2cm 2.5cm;
 }
 
+async function buildReportWordHtml(){
+  const reportBody = await buildReportContent();
+  const reportCss = await fetch("./report.css", { cache: "no-store" })
+    .then(r => r.text())
+    .catch(() => "");
+
+  return `<!doctype html>
+<html lang="nb">
+<head>
+  <meta charset="utf-8">
+  <title>Befaringsrapport</title>
+  <style>${reportCss}</style>
+</head>
+<body>
+${reportBody}
+</body>
+</html>`;
+}
+
 body {
   margin: 0;
   padding: 0;
@@ -3242,7 +3261,7 @@ async function exportToWord(){
 async function exportAndEmail(){
   let html = "";
   try {
-    html = await buildReportHtml();
+    html = await buildReportWordHtml();
   } catch (err){
     console.error(err);
   }
