@@ -373,6 +373,8 @@ function init(){
   $("btnGPS").addEventListener("click", getGPS);
   const captureMapBtn = $("btnCaptureMap");
   if(captureMapBtn) captureMapBtn.addEventListener("click", () => captureLocationMapSnapshot());
+  const reloadMapBtn = $("btnReloadMap");
+  if(reloadMapBtn) reloadMapBtn.addEventListener("click", () => refreshLocationMap());
 
   // Buildings
   $("btnAddBuilding").addEventListener("click", addBuilding);
@@ -1510,6 +1512,12 @@ function setMapTileProvider(index){
       }
     }, 1500);
   });
+}
+
+function refreshLocationMap(){
+  if(!locationMap) return;
+  setMapTileProvider(locationMapTileProviderIndex);
+  setTimeout(() => locationMap.invalidateSize(), 60);
 }
 
 function centerMapToActiveLocation(){
