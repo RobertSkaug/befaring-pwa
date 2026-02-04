@@ -166,6 +166,7 @@
      ========================= */
   img {
     max-width: 100% !important;
+    max-height: 6cm !important;
     height: auto !important;
     break-inside: avoid;
     page-break-inside: avoid;

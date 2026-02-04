@@ -336,6 +336,30 @@
   align-items: center;
 }
 
+.word-export {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.warning-btn {
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  border: 1px solid var(--b);
+  background: #fff7e6;
+  color: #b45309;
+  font-size: 14px;
+  font-weight: 700;
+  line-height: 1;
+  cursor: pointer;
+  padding: 0;
+}
+
+.warning-btn:hover {
+  background: #fff1cc;
+}
+
 @media (max-width: 640px) {
   .report-actions {
     flex-direction: column;
@@ -344,6 +368,11 @@
   
   .report-actions .btn {
     width: 100%;
+  }
+
+  .word-export {
+    width: 100%;
+    justify-content: space-between;
   }
 }
 

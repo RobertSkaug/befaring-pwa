@@ -299,7 +299,9 @@ function init(){
 
   // Eksport-knapper
   $("btnExportPDF").addEventListener("click", exportToPDF);
-  $("btnExportEmail").addEventListener("click", exportAndEmail);
+  const wordBtn = $("btnExportWord");
+  if (wordBtn) wordBtn.addEventListener("click", exportToWordFromTemplate);
+  $("btnExportEmail").addEventListener("click", exportToWordFromTemplate);
 
   // BRREG: orgnr input auto fetch
   $("orgnr").addEventListener("input", async (e) => {
@@ -391,7 +393,8 @@ function init(){
   const helpMap = {
     btnHelpDesc: { popId: "popDesc", title: "Bygningsbeskrivelse" },
     btnHelpSafety: { popId: "popSafety", title: "Sikkerhetsforhold" },
-    btnHelpRisk: { popId: "popRisk", title: "Generell vurdering av risiko" }
+    btnHelpRisk: { popId: "popRisk", title: "Generell vurdering av risiko" },
+    btnWordWarning: { popId: "popWordWarning", title: "Word-rapport" }
   };
   Object.keys(helpMap).forEach(id => {
     const el = $(id);
@@ -3204,6 +3207,254 @@ async function printReport(reportHtml) {
 async function exportToPDF(){
   const html = await buildReportContent();
   await printReport(html);
+}
+
+async function buildWordTemplateData(){
+  const inspectionDate = formatDateNo(state.inspectionDate);
+  const customerName = state.customer.name || "—";
+  const orgnr = state.customer.orgnr || "—";
+
+  const config = getMaterialConfig();
+  const labelFor = (code) => config.materialLabels[code] || code;
+
+  const materialsTextForPart = (bld, partKey, legacyKey) => {
+    if (bld.materials && !Array.isArray(bld.materials)) {
+      const partState = bld.materials[partKey] || {};
+      const selected = Array.isArray(partState.selected) ? partState.selected : [];
+      let labels = selected.map(labelFor).filter(Boolean);
+      if (selected.includes("annet") && partState.otherText){
+        labels = labels.filter(l => l !== labelFor("annet"));
+        labels.push(`Annet: ${partState.otherText}`);
+      }
+      if (labels.length > 0) return labels.join(", ");
+    }
+
+    const legacy = bld.constructionMaterials || {};
+    const legacyItems = legacy[legacyKey] || [];
+    const legacyLabels = legacyItems
+      .filter(i => i.type === "material")
+      .map(i => i.label)
+      .filter(Boolean)
+      .sort();
+    if (legacyLabels.length > 0) return legacyLabels.join(", ");
+
+    const legacyArray = Array.isArray(bld.materials) ? bld.materials : (Array.isArray(bld.legacyMaterials) ? bld.legacyMaterials : []);
+    if (legacyArray.length > 0) {
+      const materialLabels = legacyArray.map(code => {
+        const m = LEGACY_MATERIALS.find(x => x.code === code);
+        return m ? m.label : code;
+      }).sort();
+      return materialLabels.join(", ");
+    }
+
+    return "—";
+  };
+
+  const protectionText = (bld) => {
+    const entries = bld.protectionMeasures && bld.protectionMeasures.length > 0
+      ? bld.protectionMeasures
+      : (bld.protection && bld.protection.length > 0 ? bld.protection : []);
+
+    const labels = entries.map(entry => {
+      const code = typeof entry === "string" ? entry : (entry?.code || entry?.label);
+      if (!code) return null;
+      const p = PROTECTION.find(x => x.code === code);
+      return p ? p.label : code;
+    }).filter(Boolean).sort();
+
+    return labels.length > 0 ? labels.join(", ") : "—";
+  };
+
+  const klpAttendees = state.attendees.klp
+    .filter(a => a.name)
+    .map(a => ({ navn: a.name, rolle: a.title || "" }));
+
+  const customerAttendees = state.attendees.customer
+    .filter(a => a.name)
+    .map(a => ({ navn: a.name, rolle: a.title || "" }));
+
+  const objects = [];
+  state.locations.forEach(loc => {
+    loc.buildings.forEach(bld => {
+      if (bld.label || loc.address){
+        const label = bld.label || "Bygg";
+        const addr = loc.address || "Adresse ikke oppgitt";
+        const buildingNo = bld.buildingNo ? ` (bygningsnr. ${bld.buildingNo})` : "";
+        objects.push({ label, address: addr, buildingNo, text: `${label}: ${addr}${buildingNo}` });
+      }
+    });
+  });
+
+  const buildings = [];
+  state.locations.forEach(loc => {
+    loc.buildings.forEach(bld => {
+      const label = bld.label || "Bygg";
+      const address = loc.address || "—";
+      const buildingNo = bld.buildingNo || "—";
+      const totalArea = bld.areaM2 ? `${bld.areaM2} m²` : "—";
+      const buildYear = bld.buildYear || "—";
+      const floors = bld.floors || "—";
+      const businessList = (bld.businessInBuilding || []).filter(Boolean);
+      const areaBreakdown = bld.areaBreakdown ? Object.entries(bld.areaBreakdown).map(([k, v]) => ({ key: k, value: v })) : [];
+
+      const constrParts = [];
+      if (bld.columns && bld.columns.length > 0) constrParts.push(`Søyler: ${bld.columns.join(", ")}`);
+      if (bld.beams && bld.beams.length > 0) constrParts.push(`Bjelker: ${bld.beams.join(", ")}`);
+      if (bld.deck && bld.deck.length > 0) constrParts.push(`Dekke: ${bld.deck.join(", ")}`);
+      if (bld.roof && bld.roof.length > 0) constrParts.push(`Tak: ${bld.roof.join(", ")}`);
+      if (bld.outerWall && bld.outerWall.length > 0) constrParts.push(`Yttervegg: ${bld.outerWall.join(", ")}`);
+
+      buildings.push({
+        navn: label,
+        adresse: address,
+        bygningsnummer: buildingNo,
+        totalareal: totalArea,
+        virksomhet: businessList.length ? businessList.join("\n") : "—",
+        fordeling_virksomhet: areaBreakdown.length ? areaBreakdown.map(e => `${e.key}: ${e.value} m²`).join("\n") : "—",
+        byggaar: buildYear,
+        etasjer: floors,
+        materialer_soyler: materialsTextForPart(bld, "soeyler", "soyler"),
+        materialer_bjelker: materialsTextForPart(bld, "bjelker", "bjelker"),
+        materialer_tak: materialsTextForPart(bld, "tak", "tak"),
+        materialer_yttervegg: materialsTextForPart(bld, "yttervegg", "yttervegg"),
+        beskyttelse: protectionText(bld),
+        bygningsbeskrivelse: bld.description || "—",
+        sikkerhetsforhold: bld.safety || "—",
+        generell_risiko: bld.risk || "—"
+      });
+    });
+  });
+
+  const severityLabel = (s) => {
+    if (!s) return "";
+    const v = s.toLowerCase();
+    if (v === "lav") return "Mindre";
+    if (v === "middels") return "Middels";
+    if (v === "høy") return "Alvorlig";
+    return s;
+  };
+
+  const buildFindingDetails = async (f, idx, sectionPrefix) => {
+    const loc = state.locations.find(l => l.id === f.locationId);
+    const bld = loc?.buildings.find(b => b.id === f.buildingId);
+    const buildingLabel = bld?.label || f.buildingHeading || "Bygg";
+    const buildingNo = bld?.buildingNo ? ` (${bld.buildingNo})` : "";
+
+    const title = f.title || "Ikke oppgitt";
+    const desc = f.desc || "Ikke oppgitt";
+    const due = f.dueDate ? formatDateNo(f.dueDate) : "Ikke oppgitt";
+    const sev = f.severity ? severityLabel(f.severity) : "Ikke oppgitt";
+
+    let imagesBlock = "Ikke oppgitt";
+    if (f.imageAssets && f.imageAssets.length > 0 && window.ImageStore?.getImage) {
+      const parts = [];
+      for (const [imgIdx, imageId] of f.imageAssets.entries()) {
+        const img = await window.ImageStore.getImage(imageId);
+        if (img) {
+          const imgSrc = img.hasAnnotations ? img.annotatedDataURL : img.originalDataURL;
+          const caption = img.notes || img.comment || "";
+          parts.push(`![Bilde ${sectionPrefix}.${idx + 1}.${imgIdx + 1}](${imgSrc})` + (caption ? `\n${caption}` : ""));
+        }
+      }
+      if (parts.length > 0) imagesBlock = parts.join("\n\n");
+    }
+
+    return {
+      nr: `${sectionPrefix}.${idx + 1}`,
+      kategori: title,
+      beskrivelse: `Tittel: ${title}\nBeskrivelse: ${desc}\nAlvorlighet: ${sev}\nBygg: ${buildingLabel}${buildingNo}\nFrist: ${due}\nBilder:\n${imagesBlock}`,
+      risikoniva: sev,
+      bygg_referanse: `${buildingLabel}${buildingNo}`,
+      frist: due
+    };
+  };
+
+  const avvik = [];
+  const avvikList = state.findings.filter(f => (String(f.type || "").trim().toLowerCase() === "avvik"));
+  for (const [idx, f] of avvikList.entries()) {
+    avvik.push(await buildFindingDetails(f, idx, "2"));
+  }
+
+  const anbefalinger = [];
+  const anbList = state.findings.filter(f => (String(f.type || "").trim().toLowerCase() === "anbefaling"));
+  for (const [idx, f] of anbList.entries()) {
+    const details = await buildFindingDetails(f, idx, "3");
+    anbefalinger.push({
+      nr: details.nr,
+      avvik_ref: details.kategori,
+      beskrivelse: details.beskrivelse,
+      prioritet: "Ikke oppgitt",
+      frist: details.frist
+    });
+  }
+
+  return {
+    rapport: {
+      dato: inspectionDate,
+      id: `BFR-${state.inspectionDate || "—"}`,
+      utarbeidet_av: klpAttendees[0]?.navn || "Ikke oppgitt",
+      rolle: klpAttendees[0]?.rolle || "Ikke oppgitt"
+    },
+    kunde: {
+      navn: customerName || "Ikke oppgitt",
+      orgnr: orgnr || "Ikke oppgitt",
+      kontaktperson: customerAttendees[0]?.navn || "Ikke oppgitt",
+      kontaktinfo: "Ikke oppgitt"
+    },
+    deltakere: {
+      klp: klpAttendees.length
+        ? klpAttendees.map(a => `- ${a.navn}${a.rolle ? " – " + a.rolle : ""}`).join("\n")
+        : "Ikke oppgitt",
+      kunde: customerAttendees.length
+        ? customerAttendees.map(a => `- ${a.navn}${a.rolle ? " – " + a.rolle : ""}`).join("\n")
+        : "Ikke oppgitt"
+    },
+    bygg: buildings,
+    avvik,
+    anbefalinger
+  };
+}
+
+async function exportToWordFromTemplate(){
+  if (!window.Mustache || !window.marked) {
+    alert("Kunne ikke laste Markdown-bibliotekene. Prøv å oppdatere siden.");
+    return;
+  }
+
+  let templateText;
+  try {
+    const res = await fetch("./Befaringsrapport_template_like_original.md", { cache: "no-store" });
+    if (!res.ok) throw new Error("Template ikke funnet");
+    templateText = await res.text();
+  } catch (err) {
+    alert("Fant ikke Befaringsrapport_template_like_original.md. Sjekk at filen ligger i rotmappen.");
+    return;
+  }
+
+  try {
+    const data = await buildWordTemplateData();
+    const renderedMd = window.Mustache.render(templateText, data);
+    const htmlBody = window.marked.parse(renderedMd);
+    const html = `<!doctype html><html><head><meta charset="utf-8">
+      <style>
+        body { font-family: Calibri, Arial, sans-serif; font-size: 11pt; line-height: 1.5; color: #111; }
+        h1,h2,h3 { font-weight: 700; }
+        h1 { font-size: 20pt; }
+        h2 { font-size: 14pt; margin-top: 18pt; }
+        h3 { font-size: 12pt; margin-top: 12pt; }
+        ul { margin: 6pt 0 12pt 18pt; }
+        li { margin: 2pt 0; }
+        img { max-width: 100%; max-height: 6cm; height: auto; object-fit: contain; }
+      </style>
+    </head><body>${htmlBody}</body></html>`;
+
+    const out = new Blob([html], { type: "application/msword" });
+    const filename = `Befaringsrapport-${state.customer.name || "rapport"}-${formatDateNo(state.inspectionDate)}.doc`;
+    downloadFile(out, filename);
+  } catch (err) {
+    console.error("Word export error", err);
+    alert("Kunne ikke generere Word-rapport fra MD. Sjekk malfilen og plassholderne.");
+  }
 }
 
 async function exportToWord(){

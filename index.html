@@ -386,7 +386,16 @@
       <h1>Rapport</h1>
       <div class="report-actions">
         <button class="btn btn--secondary" id="btnExportPDF">📄 Åpne som PDF</button>
-        <button class="btn btn--primary" id="btnExportEmail">📧 Send på e-post</button>
+        <div class="word-export">
+          <button class="btn btn--primary" id="btnExportEmail">📝 Åpne som Word</button>
+          <button type="button" class="warning-btn" id="btnWordWarning" aria-label="Advarsel for Word-rapport" title="Klikk for info">⚠️</button>
+          <div popover="auto" id="popWordWarning" class="help-popover">
+            <button class="help-popover__close" aria-label="Lukk">×</button>
+            <div class="help-popover__content">
+              Word-rapporten blir ikke like pen som PDF-rapporten.
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -414,6 +423,10 @@
 <script src="./imageCaptureFlow.js"></script>
 <script src="./thumbnailGrid.js"></script>
 <script src="./src/config/materials.js"></script>
+<script src="https://unpkg.com/pizzip@3.1.7/dist/pizzip.min.js"></script>
+<script src="https://unpkg.com/docxtemplater@3.37.14/build/docxtemplater.js"></script>
+<script src="https://unpkg.com/mustache@4.2.0/mustache.min.js"></script>
+<script src="https://unpkg.com/marked@12.0.2/marked.min.js"></script>
 <script src="./app.js"></script>
 </body>
 </html>
