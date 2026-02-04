@@ -175,6 +175,16 @@ body {
   margin-top: 2mm;
 }
 
+.report__object-photo {
+  display: block;
+  max-width: 100%;
+  max-height: 3cm;
+  height: auto;
+  object-fit: contain;
+  border: 1px solid #e6e6e6;
+  border-radius: 3mm;
+}
+
 /* Infobokser (fast tekst) */
 .report__infobox {
   background: #FFE1E1;

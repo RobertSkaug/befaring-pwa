@@ -172,6 +172,10 @@
     page-break-inside: avoid;
   }
 
+  .report__object-photo {
+    max-height: 3cm !important;
+  }
+
   /* =========================
      G) SKJUL ELEMENTER I PRINT
      ========================= */

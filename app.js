@@ -1951,7 +1951,7 @@ async function buildReportHtml(){
       const locImage = locImages && locImages.length > 0 ? locImages[0] : null;
       if (locImage) {
         const imgSrc = locImage.hasAnnotations ? locImage.annotatedDataURL : locImage.originalDataURL;
-        locImageHtml = `\n<div class="report__object-image"><img class="report__image" src="${imgSrc}" alt="Bilde av bygg" /></div>`;
+        locImageHtml = `\n<div class="report__object-image"><img class="report__object-photo" src="${imgSrc}" alt="Bilde av bygg" /></div>`;
         if (locImage.notes) {
           locImageHtml += `\n<div class="report__image-caption">${esc(locImage.notes)}</div>`;
         }
@@ -2820,7 +2820,7 @@ async function buildReportContent() {
       const locImage = locImages && locImages.length > 0 ? locImages[0] : null;
       if (locImage) {
         const imgSrc = locImage.hasAnnotations ? locImage.annotatedDataURL : locImage.originalDataURL;
-        locImageHtml = `\n<div class="report__object-image"><img class="report__image" src="${imgSrc}" alt="Bilde av bygg" /></div>`;
+        locImageHtml = `\n<div class="report__object-image"><img class="report__object-photo" src="${imgSrc}" alt="Bilde av bygg" /></div>`;
         if (locImage.notes) {
           locImageHtml += `\n<div class="report__image-caption">${esc(locImage.notes)}</div>`;
         }
