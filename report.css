@@ -167,6 +167,14 @@ body {
   margin: 0;
 }
 
+.report__object-item {
+  margin-bottom: 4mm;
+}
+
+.report__object-image {
+  margin-top: 2mm;
+}
+
 /* Infobokser (fast tekst) */
 .report__infobox {
   background: #FFE1E1;

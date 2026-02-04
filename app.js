@@ -333,6 +333,8 @@ function init(){
 
   // Locations
   $("btnAddLocation").addEventListener("click", addLocation);
+  const locImgBtn = $("btnAddLocationImage");
+  if (locImgBtn) locImgBtn.addEventListener("click", startLocationImageCapture);
   $("address").addEventListener("input", e => { getActiveLocation().address = e.target.value; renderLocationTabs(); });
 
   $("btnGPS").addEventListener("click", getGPS);
@@ -964,6 +966,8 @@ function renderActiveLocationFields(){
   renderAddressSuggestions([]);
   renderBusinessSuggestions([]);
   $("businessStatus").textContent = "";
+
+  renderLocationImageGrid();
 }
 
 function onBuildingFieldChange(){
@@ -1671,6 +1675,49 @@ function nextFindingSeqForLocation(locationId){
   const count = state.findings.filter(f => f.locationId === locationId).length;
   return count + 1;
 }
+
+async function renderLocationImageGrid(){
+  const container = $("locationImageThumbnails");
+  if (!container || !window.ImageStore || !window.ThumbnailGrid) return;
+
+  const loc = getActiveLocation();
+  if (!loc) return;
+
+  const grid = new window.ThumbnailGrid(
+    "locationImageThumbnails",
+    loc.id,
+    "location"
+  );
+  await grid.render();
+}
+
+async function startLocationImageCapture(){
+  const locs = state.locations || [];
+  if(!locs.length){
+    alert("Legg til minst én lokasjon først.");
+    return;
+  }
+
+  const loc = getActiveLocation();
+  if (!loc) return;
+
+  const flow = new window.ImageCaptureFlow(
+    loc.id,
+    "location",
+    async (imageIds) => {
+      const grid = new window.ThumbnailGrid(
+        "locationImageThumbnails",
+        loc.id,
+        "location"
+      );
+      await grid.render();
+
+      alert(`${imageIds.length} bilde(r) lagt til for lokasjonen.`);
+    }
+  );
+
+  await flow.start();
+}
 function buildRefNo(locationId){
   const locIdx = locationIndexById(locationId) + 1;
   const seq = String(nextFindingSeqForLocation(locationId)).padStart(4,"0");
@@ -1897,16 +1944,29 @@ async function buildReportHtml(){
   
   // Liste over objekter som er befart
   let objectsList = "";
-  state.locations.forEach(loc => {
-    loc.buildings.forEach(bld => {
+  for (const loc of state.locations) {
+    let locImageHtml = "";
+    if (window.ImageStore?.getImagesByParent) {
+      const locImages = await window.ImageStore.getImagesByParent(loc.id);
+      const locImage = locImages && locImages.length > 0 ? locImages[0] : null;
+      if (locImage) {
+        const imgSrc = locImage.hasAnnotations ? locImage.annotatedDataURL : locImage.originalDataURL;
+        locImageHtml = `\n<div class="report__object-image"><img class="report__image" src="${imgSrc}" alt="Bilde av bygg" /></div>`;
+        if (locImage.notes) {
+          locImageHtml += `\n<div class="report__image-caption">${esc(locImage.notes)}</div>`;
+        }
+      }
+    }
+
+    for (const bld of loc.buildings) {
       if (bld.label || loc.address){
         const label = bld.label || "Bygg";
         const addr = loc.address || "Adresse ikke oppgitt";
         const buildingNo = bld.buildingNo ? ` (bygningsnr. ${esc(bld.buildingNo)})` : "";
-        objectsList += `<li><strong>${esc(label)}</strong>: ${esc(addr)}${buildingNo}</li>\n`;
+        objectsList += `<li class="report__object-item"><div><strong>${esc(label)}</strong>: ${esc(addr)}${buildingNo}</div>${locImageHtml}</li>\n`;
       }
-    });
-  });
+    }
+  }
   
   // Kapittel 1: Beskrivelse av bygg (ett avsnitt pr bygg)
   let buildingsSection = "";
@@ -2753,16 +2813,29 @@ async function buildReportContent() {
   
   // Liste over objekter som er befart
   let objectsList = "";
-  state.locations.forEach(loc => {
-    loc.buildings.forEach(bld => {
+  for (const loc of state.locations) {
+    let locImageHtml = "";
+    if (window.ImageStore?.getImagesByParent) {
+      const locImages = await window.ImageStore.getImagesByParent(loc.id);
+      const locImage = locImages && locImages.length > 0 ? locImages[0] : null;
+      if (locImage) {
+        const imgSrc = locImage.hasAnnotations ? locImage.annotatedDataURL : locImage.originalDataURL;
+        locImageHtml = `\n<div class="report__object-image"><img class="report__image" src="${imgSrc}" alt="Bilde av bygg" /></div>`;
+        if (locImage.notes) {
+          locImageHtml += `\n<div class="report__image-caption">${esc(locImage.notes)}</div>`;
+        }
+      }
+    }
+
+    for (const bld of loc.buildings) {
       if (bld.label || loc.address){
         const label = bld.label || "Bygg";
         const addr = loc.address || "Adresse ikke oppgitt";
         const buildingNo = bld.buildingNo ? ` (bygningsnr. ${esc(bld.buildingNo)})` : "";
-        objectsList += `<li><strong>${esc(label)}</strong>: ${esc(addr)}${buildingNo}</li>\n`;
+        objectsList += `<li class="report__object-item"><div><strong>${esc(label)}</strong>: ${esc(addr)}${buildingNo}</div>${locImageHtml}</li>\n`;
       }
-    });
-  });
+    }
+  }
   
   // Kapittel 1: Beskrivelse av bygg (ett avsnitt pr bygg)
   let buildingsSection = "";
