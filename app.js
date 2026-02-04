@@ -393,8 +393,7 @@ function init(){
   const helpMap = {
     btnHelpDesc: { popId: "popDesc", title: "Bygningsbeskrivelse" },
     btnHelpSafety: { popId: "popSafety", title: "Sikkerhetsforhold" },
-    btnHelpRisk: { popId: "popRisk", title: "Generell vurdering av risiko" },
-    btnWordWarning: { popId: "popWordWarning", title: "Word-rapport" }
+    btnHelpRisk: { popId: "popRisk", title: "Generell vurdering av risiko" }
   };
   Object.keys(helpMap).forEach(id => {
     const el = $(id);
@@ -420,6 +419,22 @@ function init(){
       });
     }
   });
+
+  const wordWarningBtn = $("btnWordWarning");
+  const wordWarningPop = $("popWordWarning");
+  if (wordWarningBtn) {
+    wordWarningBtn.addEventListener("click", () => {
+      if (wordWarningPop && typeof wordWarningPop.showPopover === "function") {
+        if (wordWarningPop.matches(":popover-open")) { wordWarningPop.hidePopover(); return; }
+        wordWarningPop.showPopover();
+        positionHelpPopover(wordWarningBtn, wordWarningPop);
+        const closeBtn = wordWarningPop.querySelector(".help-popover__close");
+        if (closeBtn) closeBtn.onclick = () => wordWarningPop.hidePopover();
+      } else {
+        openHelpModal("Word-rapport", wordWarningPop ? wordWarningPop.textContent : "Word-rapporten blir ikke like pen som PDF-rapporten.");
+      }
+    });
+  }
 
   window.addEventListener("resize", () => {
     // Reposition any open help popovers to maintain anchoring
@@ -3427,7 +3442,8 @@ async function exportToWordFromTemplate(){
     if (!res.ok) throw new Error("Template ikke funnet");
     templateText = await res.text();
   } catch (err) {
-    alert("Fant ikke Befaringsrapport_template_like_original.md. Sjekk at filen ligger i rotmappen.");
+    alert("Fant ikke Befaringsrapport_template_like_original.md. Genererer standard Word-rapport i stedet.");
+    await exportToWord();
     return;
   }
 
@@ -3453,7 +3469,8 @@ async function exportToWordFromTemplate(){
     downloadFile(out, filename);
   } catch (err) {
     console.error("Word export error", err);
-    alert("Kunne ikke generere Word-rapport fra MD. Sjekk malfilen og plassholderne.");
+    alert("Kunne ikke generere Word-rapport fra MD. Genererer standard Word-rapport i stedet.");
+    await exportToWord();
   }
 }
 
