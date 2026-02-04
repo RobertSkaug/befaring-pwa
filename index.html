@@ -386,16 +386,7 @@
       <h1>Rapport</h1>
       <div class="report-actions">
         <button class="btn btn--secondary" id="btnExportPDF">📄 Åpne som PDF</button>
-        <div class="word-export">
-          <button class="btn btn--primary" id="btnExportEmail">📝 Åpne som Word</button>
-          <button type="button" class="warning-btn" id="btnWordWarning" aria-label="Advarsel for Word-rapport" title="Klikk for info">⚠️</button>
-          <div popover="auto" id="popWordWarning" class="help-popover">
-            <button class="help-popover__close" aria-label="Lukk">×</button>
-            <div class="help-popover__content">
-              Word-rapporten blir ikke like pen som PDF-rapporten.
-            </div>
-          </div>
-        </div>
+        <button class="btn btn--secondary" id="btnExportEmail" data-tooltip="Word-rapporten blir ikke like pen som PDF-rapporten.">📝 Åpne som Word</button>
       </div>
     </div>
 

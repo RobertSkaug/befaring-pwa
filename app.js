@@ -420,21 +420,6 @@ function init(){
     }
   });
 
-  const wordWarningBtn = $("btnWordWarning");
-  const wordWarningPop = $("popWordWarning");
-  if (wordWarningBtn) {
-    wordWarningBtn.addEventListener("click", () => {
-      if (wordWarningPop && typeof wordWarningPop.showPopover === "function") {
-        if (wordWarningPop.matches(":popover-open")) { wordWarningPop.hidePopover(); return; }
-        wordWarningPop.showPopover();
-        positionHelpPopover(wordWarningBtn, wordWarningPop);
-        const closeBtn = wordWarningPop.querySelector(".help-popover__close");
-        if (closeBtn) closeBtn.onclick = () => wordWarningPop.hidePopover();
-      } else {
-        openHelpModal("Word-rapport", wordWarningPop ? wordWarningPop.textContent : "Word-rapporten blir ikke like pen som PDF-rapporten.");
-      }
-    });
-  }
 
   window.addEventListener("resize", () => {
     // Reposition any open help popovers to maintain anchoring
