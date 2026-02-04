@@ -73,6 +73,23 @@
   pointer-events: none;
 }
 
+.word-export {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+}
+
+.btn-note {
+  font-size: 12px;
+  color: #7a3e00;
+  line-height: 1.35;
+}
+
+.mobile-only {
+  display: none;
+}
+
 .btn[data-tooltip] {
   position: relative;
 }
@@ -371,6 +388,22 @@
 
 
 @media (max-width: 640px) {
+  .btn[data-tooltip]::after {
+    display: none;
+  }
+
+  .mobile-only {
+    display: block;
+  }
+
+  .word-export {
+    width: 100%;
+  }
+
+  .word-export .btn {
+    width: 100%;
+  }
+
   .report-actions {
     flex-direction: column;
     gap: 10px;
