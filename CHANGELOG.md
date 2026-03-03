@@ -1,5 +1,15 @@
 # Changelog – AI Avvik-Forslag Feature
 
+## 2026-03-03
+
+### ✨ ENDRET: app.js
+- Oppdatert `KLP_EMPLOYEES` med to nye deltakere:
+  - Henning Holtet
+  - Anders Rørvik Ellingbø
+
+### 🚀 DEPLOY
+- Endringen er publisert til `gh-pages` (live-løsning).
+
 ## 📝 Endringer Per Fil
 
 ### ✨ ENDRET: index.html
