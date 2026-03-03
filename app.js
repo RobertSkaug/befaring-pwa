@@ -58,6 +58,13 @@ function setupUpdater(){
       await forceUpdateNow();
     });
   }
+
+  const resetBtn = document.getElementById("mBtnResetApp");
+  if (resetBtn){
+    resetBtn.addEventListener("click", async () => {
+      await resetAppDataAndRefresh();
+    });
+  }
 }
 
 function showUpdateButton(show){
@@ -98,6 +105,38 @@ async function forceUpdateNow(){
   const u = new URL(location.href);
   u.searchParams.set("v", String(Date.now()));
   location.replace(u.toString());
+}
+
+async function clearPersistedAppData(){
+  try {
+    localStorage.removeItem("befaringState");
+  } catch {}
+
+  try {
+    if (window.ImageStore?.clearAllImages) {
+      await window.ImageStore.clearAllImages();
+    }
+  } catch {}
+}
+
+async function resetAppDataAndRefresh(){
+  const confirmed = window.confirm(
+    "Dette nullstiller all lagret data i appen (inkludert bilder) på denne enheten. Vil du fortsette?"
+  );
+  if (!confirmed) return;
+
+  await clearPersistedAppData();
+
+  const withUpdate = window.confirm(
+    "Vil du også hente siste app-versjon nå? (Anbefales på iPhone/Hjemskjerm)"
+  );
+
+  if (withUpdate) {
+    await forceUpdateNow();
+    return;
+  }
+
+  location.replace("./");
 }
 
 // Adresseforslag (Nominatim) cache + parallell

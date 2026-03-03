@@ -92,6 +92,20 @@ async function deleteImageAsset(id) {
   });
 }
 
+// Clear all image assets
+async function clearAllImageAssets() {
+  if (!db) await initImageDB();
+
+  return new Promise((resolve, reject) => {
+    const transaction = db.transaction([STORE_NAME], "readwrite");
+    const store = transaction.objectStore(STORE_NAME);
+
+    const request = store.clear();
+    request.onsuccess = () => resolve();
+    request.onerror = () => reject(request.error);
+  });
+}
+
 // Convert File/Blob to base64 data URL
 function blobToDataURL(blob) {
   return new Promise((resolve, reject) => {
@@ -160,6 +174,7 @@ window.ImageStore = {
   getImage: getImageAsset,
   getImagesByParent: getImagesByParent,
   deleteImage: deleteImageAsset,
+  clearAllImages: clearAllImageAssets,
   createImageAsset: createImageAsset,
   updateImageAnnotations: updateImageAnnotations,
   blobToDataURL,
