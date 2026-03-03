@@ -176,12 +176,14 @@ const CONSTR_WALL = [
 
 const KLP_EMPLOYEES = [
   "Aksel Hope Jøndahl",
+  "Anders Rørvik Ellingbø",
   "Anders Storløkken",
   "Ann Kristin Terese Bjørgo",
   "Baard Isdahl",
   "Chris Ten Hoopen",
   "Christin Schackt Bjølverud",
   "Gry-Merete Olaisen",
+  "Henning Holtet",
   "Jochim Jakobsen",
   "Jonas Pedersen",
   "Jon Frode Skirbekk",
