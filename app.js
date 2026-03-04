@@ -164,6 +164,8 @@ const $ = (id) => document.getElementById(id);
 const digits = (s) => (s||"").replace(/\D+/g,"");
 const esc = (s) => String(s??"").replace(/[&<>"]/g, c=>({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;'}[c]));
 
+let activeDictation = null;
+
 const LEGACY_MATERIALS = [
   { code:"B", label:"Betong" },
   { code:"S", label:"Stål" },
@@ -453,6 +455,9 @@ function init(){
     btnHelpSafety: { popId: "popSafety", title: "Sikkerhetsforhold" },
     btnHelpRisk: { popId: "popRisk", title: "Generell vurdering av risiko" }
   };
+
+  setupSpeechToText();
+
   Object.keys(helpMap).forEach(id => {
     const el = $(id);
     const map = helpMap[id];
@@ -533,6 +538,91 @@ function openHelpModal(title, text){
   const modal = $("helpModal");
   $("closeHelpModal").addEventListener("click", () => modal.remove());
   modal.addEventListener("click", (e) => { if(e.target === modal) modal.remove(); });
+}
+
+function setupSpeechToText(){
+  const SpeechRecognition = window.SpeechRecognition || window.webkitSpeechRecognition;
+  const mappings = [
+    { buttonId: "btnDictDesc", textareaId: "bDesc", label: "Bygningsbeskrivelse" },
+    { buttonId: "btnDictSafety", textareaId: "bSafety", label: "Sikkerhetsforhold" },
+    { buttonId: "btnDictRisk", textareaId: "bRisk", label: "Generell vurdering av risiko" }
+  ];
+
+  if(!SpeechRecognition){
+    mappings.forEach(m => {
+      const btn = $(m.buttonId);
+      if(!btn) return;
+      btn.disabled = true;
+      btn.title = "Tale til tekst støttes ikke i denne nettleseren";
+    });
+    return;
+  }
+
+  mappings.forEach(m => {
+    const btn = $(m.buttonId);
+    const textarea = $(m.textareaId);
+    if(!btn || !textarea) return;
+
+    btn.addEventListener("click", () => {
+      toggleSpeechRecognition(SpeechRecognition, btn, textarea, m.label);
+    });
+  });
+}
+
+function toggleSpeechRecognition(SpeechRecognition, buttonEl, textareaEl, fieldLabel){
+  if(activeDictation && activeDictation.buttonEl === buttonEl){
+    activeDictation.recognition.stop();
+    return;
+  }
+
+  if(activeDictation){
+    activeDictation.recognition.stop();
+    activeDictation = null;
+  }
+
+  const recognition = new SpeechRecognition();
+  recognition.lang = "nb-NO";
+  recognition.interimResults = true;
+  recognition.continuous = true;
+
+  buttonEl.textContent = "⏹";
+  buttonEl.title = `Stopper tale til tekst for ${fieldLabel}`;
+
+  recognition.onresult = (event) => {
+    let transcript = "";
+
+    for(let i = event.resultIndex; i < event.results.length; i++){
+      const result = event.results[i];
+      if(result.isFinal){
+        transcript += (result[0]?.transcript || "").trim() + " ";
+      }
+    }
+
+    const normalized = transcript.trim();
+    if(!normalized) return;
+
+    const needsSpacer = textareaEl.value && !/[\s\n]$/.test(textareaEl.value);
+    textareaEl.value += `${needsSpacer ? " " : ""}${normalized}`;
+    textareaEl.dispatchEvent(new Event("input", { bubbles: true }));
+  };
+
+  recognition.onerror = (event) => {
+    const ignoredErrors = ["no-speech", "aborted"];
+    if(!ignoredErrors.includes(event.error)){
+      alert(`Tale til tekst feilet: ${event.error}`);
+    }
+  };
+
+  recognition.onend = () => {
+    if(activeDictation && activeDictation.buttonEl === buttonEl){
+      activeDictation = null;
+    }
+    buttonEl.textContent = "🎤";
+    buttonEl.title = "Tale til tekst";
+  };
+
+  recognition.start();
+  activeDictation = { recognition, buttonEl };
 }
 
 /**
